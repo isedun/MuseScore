@@ -206,7 +206,7 @@ private:
     void navigateToTextElementByFraction(const Fraction& fraction);
     void navigateToTextElementInNearMeasure(MoveDirection direction);
 
-    void startNoteInputIfNeed();
+    void startNoteInput();
 
     bool hasSelection() const;
     mu::engraving::EngravingItem* selectedElement() const;
@@ -222,6 +222,9 @@ private:
     bool isNotationPage() const;
     bool isStandardStaff() const;
     bool isTablatureStaff() const;
+
+    void checkForScoreCorruptions();
+
     void registerAction(const muse::actions::ActionCode&, void (NotationActionController::*)(const muse::actions::ActionData& data),
                         bool (NotationActionController::*)() const = &NotationActionController::isNotationPage);
     void registerAction(const muse::actions::ActionCode&, void (NotationActionController::*)(),

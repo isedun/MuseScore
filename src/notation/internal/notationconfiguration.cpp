@@ -108,7 +108,9 @@ static const Settings::Key NEED_TO_SHOW_ADD_GUITAR_BEND_ERROR_MESSAGE_KEY(module
 static const Settings::Key PIANO_KEYBOARD_NUMBER_OF_KEYS(module_name,  "pianoKeyboard/numberOfKeys");
 
 static const Settings::Key USE_NEW_PERCUSSION_PANEL_KEY(module_name,  "ui/useNewPercussionPanel");
-static const Settings::Key AUTO_SHOW_PERCUSSION_PANEL_KEY(module_name,  "ui/autoShowPercussionPanel");
+static const Settings::Key PERCUSSION_PANEL_USE_NOTATION_PREVIEW_KEY(module_name,  "ui/percussionPanelUseNotationPreview");
+static const Settings::Key PERCUSSION_PANEL_AUTO_SHOW_MODE_KEY(module_name,  "ui/percussionPanelAutoShowMode");
+static const Settings::Key AUTO_CLOSE_PERCUSSION_PANEL_KEY(module_name, "ui/autoClosePercussionPanel");
 static const Settings::Key SHOW_PERCUSSION_PANEL_SWAP_DIALOG(module_name,  "ui/showPercussionPanelPadSwapDialog");
 static const Settings::Key PERCUSSION_PANEL_MOVE_MIDI_NOTES_AND_SHORTCUTS(module_name,  "ui/percussionPanelMoveMidiNotesAndShortcuts");
 
@@ -253,7 +255,7 @@ void NotationConfiguration::init()
         m_isPlayChordSymbolsChanged.notify();
     });
 
-    settings()->setDefaultValue(IS_PLAY_PREVIEW_NOTES_IN_INPUT_BY_DURATION_ENABLED, Val(false));
+    settings()->setDefaultValue(IS_PLAY_PREVIEW_NOTES_IN_INPUT_BY_DURATION_ENABLED, Val(true));
     settings()->valueChanged(IS_PLAY_PREVIEW_NOTES_IN_INPUT_BY_DURATION_ENABLED).onReceive(nullptr, [this](const Val&) {
         m_isPlayNotesPreviewInInputByDurationChanged.notify();
     });
@@ -320,14 +322,24 @@ void NotationConfiguration::init()
         m_midiInputUseWrittenPitch.set(val.toBool());
     });
 
-    settings()->setDefaultValue(USE_NEW_PERCUSSION_PANEL_KEY, Val(false)); // TODO: true when new percussion panel is ready
+    settings()->setDefaultValue(USE_NEW_PERCUSSION_PANEL_KEY, Val(true));
     settings()->valueChanged(USE_NEW_PERCUSSION_PANEL_KEY).onReceive(this, [this](const Val&) {
         m_useNewPercussionPanelChanged.notify();
     });
 
-    settings()->setDefaultValue(AUTO_SHOW_PERCUSSION_PANEL_KEY, Val(true));
-    settings()->valueChanged(AUTO_SHOW_PERCUSSION_PANEL_KEY).onReceive(this, [this](const Val&) {
-        m_autoShowPercussionPanelChanged.notify();
+    settings()->setDefaultValue(PERCUSSION_PANEL_USE_NOTATION_PREVIEW_KEY, Val(false));
+    settings()->valueChanged(PERCUSSION_PANEL_USE_NOTATION_PREVIEW_KEY).onReceive(this, [this](const Val&) {
+        m_percussionPanelUseNotationPreviewChanged.notify();
+    });
+
+    settings()->setDefaultValue(PERCUSSION_PANEL_AUTO_SHOW_MODE_KEY, Val(PercussionPanelAutoShowMode::UNPITCHED_STAFF));
+    settings()->valueChanged(PERCUSSION_PANEL_AUTO_SHOW_MODE_KEY).onReceive(this, [this](const Val&) {
+        m_percussionPanelAutoShowModeChanged.notify();
+    });
+
+    settings()->setDefaultValue(AUTO_CLOSE_PERCUSSION_PANEL_KEY, Val(true));
+    settings()->valueChanged(AUTO_CLOSE_PERCUSSION_PANEL_KEY).onReceive(this, [this](const Val&) {
+        m_autoClosePercussionPanelChanged.notify();
     });
 
     settings()->setDefaultValue(SHOW_PERCUSSION_PANEL_SWAP_DIALOG, Val(true));
@@ -1146,19 +1158,49 @@ Notification NotationConfiguration::useNewPercussionPanelChanged() const
     return m_useNewPercussionPanelChanged;
 }
 
-bool NotationConfiguration::autoShowPercussionPanel() const
+bool NotationConfiguration::percussionPanelUseNotationPreview() const
 {
-    return settings()->value(AUTO_SHOW_PERCUSSION_PANEL_KEY).toBool();
+    return settings()->value(PERCUSSION_PANEL_USE_NOTATION_PREVIEW_KEY).toBool();
 }
 
-void NotationConfiguration::setAutoShowPercussionPanel(bool autoShow)
+void NotationConfiguration::setPercussionPanelUseNotationPreview(bool use)
 {
-    settings()->setSharedValue(AUTO_SHOW_PERCUSSION_PANEL_KEY, Val(autoShow));
+    settings()->setSharedValue(PERCUSSION_PANEL_USE_NOTATION_PREVIEW_KEY, Val(use));
 }
 
-Notification NotationConfiguration::autoShowPercussionPanelChanged() const
+Notification NotationConfiguration::percussionPanelUseNotationPreviewChanged() const
 {
-    return m_autoShowPercussionPanelChanged;
+    return m_percussionPanelUseNotationPreviewChanged;
+}
+
+PercussionPanelAutoShowMode NotationConfiguration::percussionPanelAutoShowMode() const
+{
+    return settings()->value(PERCUSSION_PANEL_AUTO_SHOW_MODE_KEY).toEnum<PercussionPanelAutoShowMode>();
+}
+
+void NotationConfiguration::setPercussionPanelAutoShowMode(PercussionPanelAutoShowMode autoShowMode)
+{
+    settings()->setSharedValue(PERCUSSION_PANEL_AUTO_SHOW_MODE_KEY, Val(autoShowMode));
+}
+
+Notification NotationConfiguration::percussionPanelAutoShowModeChanged() const
+{
+    return m_percussionPanelAutoShowModeChanged;
+}
+
+bool NotationConfiguration::autoClosePercussionPanel() const
+{
+    return settings()->value(AUTO_CLOSE_PERCUSSION_PANEL_KEY).toBool();
+}
+
+void NotationConfiguration::setAutoClosePercussionPanel(bool autoClose)
+{
+    settings()->setSharedValue(AUTO_CLOSE_PERCUSSION_PANEL_KEY, Val(autoClose));
+}
+
+Notification NotationConfiguration::autoClosePercussionPanelChanged() const
+{
+    return m_autoClosePercussionPanelChanged;
 }
 
 bool NotationConfiguration::showPercussionPanelPadSwapDialog() const

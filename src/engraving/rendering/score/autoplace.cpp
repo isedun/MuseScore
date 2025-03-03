@@ -442,11 +442,20 @@ void Autoplace::doAutoplace(const Articulation* item, Articulation::LayoutData* 
 
 bool Autoplace::itemsShouldIgnoreEachOther(const EngravingItem* itemToAutoplace, const EngravingItem* itemInSkyline)
 {
+    if (itemInSkyline->isText() && itemInSkyline->explicitParent() && itemInSkyline->parent()->isSLineSegment()) {
+        return itemsShouldIgnoreEachOther(itemToAutoplace, itemInSkyline->parentItem());
+    }
+
     ElementType type1 = itemToAutoplace->type();
     ElementType type2 = itemInSkyline->type();
 
     if (type1 == ElementType::TIMESIG) {
         return type2 != ElementType::KEYSIG;
+    }
+
+    if ((type1 == ElementType::DYNAMIC || type1 == ElementType::HAIRPIN_SEGMENT)
+        && (type2 == ElementType::DYNAMIC || type2 == ElementType::HAIRPIN_SEGMENT)) {
+        return true;
     }
 
     if (type1 == type2) {
@@ -455,6 +464,7 @@ bool Autoplace::itemsShouldIgnoreEachOther(const EngravingItem* itemToAutoplace,
             ElementType::DYNAMIC,
             ElementType::EXPRESSION,
             ElementType::STICKING,
+            ElementType::HARMONY
         };
         return !itemToAutoplace->isTextBase() || muse::contains(TEXT_BASED_TYPES_WHICH_IGNORE_EACH_OTHER, type1);
     }
