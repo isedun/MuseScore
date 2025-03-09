@@ -839,10 +839,11 @@ void Measure::add(EngravingItem* e)
     }
     break;
     case ElementType::JUMP:
-        setRepeatJump(true);
-    // fall through
-
     case ElementType::MARKER:
+        if (e && (e->isJump() || (e->isMarker() && toMarker(e)->isRightMarker()))) {
+            // "To coda" markings act like jumps
+            setProperty(Pid::REPEAT_JUMP, true);
+        }
         el().push_back(e);
         break;
 
@@ -942,9 +943,10 @@ void Measure::remove(EngravingItem* e)
         break;
 
     case ElementType::JUMP:
-        setRepeatJump(false);
-    // fall through
     case ElementType::MARKER:
+        if (e->isJump() || (e->isMarker() && toMarker(e)->isRightMarker())) {
+            setProperty(Pid::REPEAT_JUMP, false);
+        }
     case ElementType::HBOX:
         if (!el().remove(e)) {
             LOGD("Measure(%p)::remove(%s,%p) not found", this, e->typeName(), e);
@@ -1341,12 +1343,10 @@ bool Measure::acceptDrop(EditData& data) const
 
     //! NOTE: Should match NotationInteraction::dragMeasureAnchorElement
     switch (e->type()) {
-    case ElementType::MEASURE_LIST:
     case ElementType::MEASURE_NUMBER:
     case ElementType::JUMP:
     case ElementType::MARKER:
     case ElementType::LAYOUT_BREAK:
-    case ElementType::STAFF_LIST:
         // Always drop to all staves
         viewer->setDropRectangle(canvasBoundingRect());
         return true;
@@ -1441,14 +1441,6 @@ EngravingItem* Measure::drop(EditData& data)
     //bool fromPalette = (e->track() == -1);
 
     switch (e->type()) {
-    case ElementType::MEASURE_LIST:
-        delete e;
-        break;
-
-    case ElementType::STAFF_LIST:
-        delete e;
-        break;
-
     case ElementType::MARKER:
     case ElementType::JUMP:
         e->setParent(this);
@@ -1798,7 +1790,7 @@ void Measure::adjustToLen(Fraction nf, bool appendRestsIfNecessary)
         if (nl > ol) {
             // move EndBarLine, TimeSigAnnounce, KeySigAnnounce
             for (Segment* seg = m->first(); seg; seg = seg->next()) {
-                if (seg->segmentType() & (SegmentType::EndBarLine | SegmentType::TimeSigAnnounce | SegmentType::KeySigAnnounce)) {
+                if (seg->segmentType() & (SegmentType::EndBarLine | SegmentType::CourtesyTimeSigType | SegmentType::CourtesyKeySigType)) {
                     seg->setRtick(nl);
                 }
             }
@@ -1976,7 +1968,7 @@ bool Measure::isFinalMeasureOfSection() const
     return false;
 }
 
-LayoutBreak* Measure::sectionBreakElement(bool includeNextFrames)
+LayoutBreak* Measure::sectionBreakElement(bool includeNextFrames) const
 {
     const MeasureBase* mb = static_cast<const MeasureBase*>(this);
 
@@ -3458,6 +3450,22 @@ void Measure::checkTrailer()
             setTrailer(seg->trailer());
             break;
         }
+    }
+}
+
+void Measure::checkEndOfMeasureChange()
+{
+    bool found = false;
+    for (Segment* seg = last(); seg != first(); seg = seg->prev()) {
+        if (seg->enabled() && seg->endOfMeasureChange()) {
+            setEndOfMeasureChange(seg->endOfMeasureChange());
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        setEndOfMeasureChange(false);
     }
 }
 

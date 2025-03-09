@@ -175,7 +175,7 @@ bool MeasuresSettingsModel::isMakeIntoSystemAvailable() const
     return m_isMakeIntoSystemAvailable;
 }
 
-int MeasuresSettingsModel::systemCount() const
+size_t MeasuresSettingsModel::systemCount() const
 {
     return m_systemCount;
 }
@@ -183,7 +183,7 @@ int MeasuresSettingsModel::systemCount() const
 void MeasuresSettingsModel::updateScoreIsInPageView()
 {
     const Score* score = currentNotation()->elements()->msScore();
-    bool isInPageView = score->layoutMode() == LayoutMode::PAGE;
+    bool isInPageView = score->layoutMode() != LayoutMode::LINE;
 
     if (m_scoreIsInPageView != isInPageView) {
         m_scoreIsInPageView = isInPageView;
@@ -213,7 +213,7 @@ void MeasuresSettingsModel::updateIsMakeIntoSystemAvailable()
 
 void MeasuresSettingsModel::updateSystemCount()
 {
-    int count = currentNotation()->elements()->msScore()->selection().selectedSystems().size();
+    size_t count = currentNotation()->elements()->msScore()->selection().selectedSystems().size();
     if (count != m_systemCount) {
         m_systemCount = count;
         emit systemCountChanged(count);

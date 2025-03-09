@@ -24,6 +24,8 @@
 #include "internal/applicationuiactions.h"
 #include "dockwindow/idockwindow.h"
 
+#include "async/async.h"
+
 #include "log.h"
 
 using namespace mu::appshell;
@@ -71,6 +73,10 @@ void NotationPageModel::init()
         updateDrumsetPanelVisibility();
         updatePercussionPanelVisibility();
     });
+
+    notationConfiguration()->percussionPanelAutoShowModeChanged().onNotify(this, [this]() {
+        updatePercussionPanelVisibility();
+    });
 }
 
 QString NotationPageModel::notationToolBarName() const
@@ -98,9 +104,9 @@ QString NotationPageModel::palettesPanelName() const
     return PALETTES_PANEL_NAME;
 }
 
-QString NotationPageModel::instrumentsPanelName() const
+QString NotationPageModel::layoutPanelName() const
 {
-    return INSTRUMENTS_PANEL_NAME;
+    return LAYOUT_PANEL_NAME;
 }
 
 QString NotationPageModel::inspectorPanelName() const
@@ -155,8 +161,8 @@ void NotationPageModel::onNotationChanged()
         return;
     }
 
+    INotationNoteInputPtr noteInput = notation->interaction()->noteInput();
     if (!notationConfiguration()->useNewPercussionPanel()) {
-        INotationNoteInputPtr noteInput = notation->interaction()->noteInput();
         noteInput->stateChanged().onNotify(this, [this]() {
             updateDrumsetPanelVisibility();
             updatePercussionPanelVisibility();
@@ -167,6 +173,14 @@ void NotationPageModel::onNotationChanged()
     INotationInteractionPtr notationInteraction = notation->interaction();
     notationInteraction->selectionChanged().onNotify(this, [this]() {
         updateDrumsetPanelVisibility();
+        updatePercussionPanelVisibility();
+    });
+
+    noteInput->noteInputStarted().onReceive(this, [this](bool) {
+        updatePercussionPanelVisibility();
+    });
+
+    noteInput->noteInputEnded().onNotify(this, [this]() {
         updatePercussionPanelVisibility();
     });
 }
@@ -198,10 +212,14 @@ void NotationPageModel::updateDrumsetPanelVisibility()
     }
 
     auto setDrumsetPanelOpen = [this, window](bool open) {
-        if (open == window->isDockOpen(DRUMSET_PANEL_NAME)) {
+        if (open == window->isDockOpenAndCurrentInFrame(DRUMSET_PANEL_NAME)) {
             return;
         }
-        dispatcher()->dispatch("dock-set-open", ActionData::make_arg2<QString, bool>(DRUMSET_PANEL_NAME, open));
+
+        //! NOTE: ensure we don't dispatch it multiple times in succession
+        muse::async::Async::call(this, [=]() {
+            dispatcher()->dispatch("dock-set-open", ActionData::make_arg2<QString, bool>(DRUMSET_PANEL_NAME, open));
+        });
     };
 
     // This should never be open when the new percussion panel is in use...
@@ -226,16 +244,22 @@ void NotationPageModel::updatePercussionPanelVisibility()
 {
     TRACEFUNC;
 
+    //! NOTE: If the user is entering percussion notes with the piano keyboard, we can assume that they
+    //! don't want the percussion panel to auto-show...
     const muse::dock::IDockWindow* window = dockWindowProvider()->window();
-    if (!window) {
+    if (!window || window->isDockOpenAndCurrentInFrame(PIANO_KEYBOARD_PANEL_NAME)) {
         return;
     }
 
     auto setPercussionPanelOpen = [this, window](bool open) {
-        if (open == window->isDockOpen(PERCUSSION_PANEL_NAME)) {
+        if (open == window->isDockOpenAndCurrentInFrame(PERCUSSION_PANEL_NAME)) {
             return;
         }
-        dispatcher()->dispatch("dock-set-open", ActionData::make_arg2<QString, bool>(PERCUSSION_PANEL_NAME, open));
+
+        //! NOTE: ensure we don't dispatch it multiple times in succession
+        muse::async::Async::call(this, [=]() {
+            dispatcher()->dispatch("dock-set-open", ActionData::make_arg2<QString, bool>(PERCUSSION_PANEL_NAME, open));
+        });
     };
 
     // This should never be open when the old drumset panel is in use...
@@ -244,34 +268,57 @@ void NotationPageModel::updatePercussionPanelVisibility()
         return;
     }
 
+    const PercussionPanelAutoShowMode autoShowMode = notationConfiguration()->percussionPanelAutoShowMode();
     const INotationPtr notation = globalContext()->currentNotation();
-    if (!notation || !notation->elements() || !notationConfiguration()->autoShowPercussionPanel()) {
+    if (!notation || !notation->elements() || autoShowMode == PercussionPanelAutoShowMode::NEVER) {
+        return;
+    }
+
+    const INotationNoteInputPtr noteInput = notation->interaction()->noteInput();
+    const bool autoClose = notationConfiguration()->autoClosePercussionPanel();
+    if (noteInput && !noteInput->isNoteInputMode() && autoShowMode == PercussionPanelAutoShowMode::UNPITCHED_STAFF_NOTE_INPUT) {
+        if (autoClose) {
+            setPercussionPanelOpen(false);
+        }
         return;
     }
 
     const mu::engraving::Score* score = notation->elements()->msScore();
     const INotationSelectionPtr selection = notation->interaction()->selection();
     if (!score || !selection || selection->isNone()) {
+        if (autoClose) {
+            setPercussionPanelOpen(false);
+        }
         return;
     }
 
-    //! NOTE: Unlike the old drumset panel, this panel shouldn't automatically close when a non-drum staff is selected...
     if (selection->isRange()) {
         const INotationSelectionRangePtr rangeSelection = selection->range();
         if (!rangeSelection) {
+            if (autoClose) {
+                setPercussionPanelOpen(false);
+            }
             return;
         }
         for (const Part* p : rangeSelection->selectedParts()) {
-            if (!p->hasDrumStaff()) {
-                return;
+            if (p->hasDrumStaff()) {
+                continue;
             }
+            if (autoClose) {
+                setPercussionPanelOpen(false);
+            }
+            return;
         }
     } else {
         for (const EngravingItem* e : selection->elements()) {
             const Staff* staff = e->staff();
-            if (!staff || !staff->isDrumStaff(e->tick())) {
-                return;
+            if (staff && staff->isDrumStaff(e->tick())) {
+                continue;
             }
+            if (autoClose) {
+                setPercussionPanelOpen(false);
+            }
+            return;
         }
     }
 

@@ -49,6 +49,7 @@
 #include "harmony.h"
 #include "key.h"
 #include "laissezvib.h"
+#include "layoutbreak.h"
 #include "linkedobjects.h"
 #include "lyrics.h"
 #include "masterscore.h"
@@ -90,7 +91,7 @@ using namespace muse::io;
 using namespace mu::engraving;
 
 namespace mu::engraving {
-static UndoMacro::ChangesInfo changesInfo(const UndoStack* stack)
+static UndoMacro::ChangesInfo changesInfo(const UndoStack* stack, bool undo = false)
 {
     IF_ASSERT_FAILED(stack) {
         static UndoMacro::ChangesInfo empty;
@@ -108,16 +109,16 @@ static UndoMacro::ChangesInfo changesInfo(const UndoStack* stack)
         return empty;
     }
 
-    return actualMacro->changesInfo();
+    return actualMacro->changesInfo(undo);
 }
 
-static std::pair<int, int> changedTicksRange(const CmdState& cmdState, const std::set<const EngravingItem*>& changedItems)
+static ScoreChangesRange buildChangesRange(const CmdState& cmdState, const UndoMacro::ChangesInfo& changes)
 {
     int startTick = cmdState.startTick().ticks();
     int endTick = cmdState.endTick().ticks();
 
-    for (const EngravingItem* element : changedItems) {
-        int tick = element->tick().ticks();
+    for (const auto& pair : changes.changedItems) {
+        int tick = pair.first->tick().ticks();
 
         if (startTick > tick) {
             startTick = tick;
@@ -128,7 +129,12 @@ static std::pair<int, int> changedTicksRange(const CmdState& cmdState, const std
         }
     }
 
-    return { startTick, endTick };
+    return { startTick, endTick,
+             cmdState.startStaff(), cmdState.endStaff(),
+             std::move(changes.changedItems),
+             std::move(changes.changedObjectTypes),
+             std::move(changes.changedPropertyIdSet),
+             std::move(changes.changedStyleIdSet) };
 }
 
 //---------------------------------------------------------
@@ -357,36 +363,22 @@ void Score::undoRedo(bool undo, EditData* ed)
     //! NOTE: the order of operations is very important here
     //! 1. for the undo operation, the list of changed elements is available before undo()
     //! 2. for the redo operation, the list of changed elements will be available after redo()
-    UndoMacro::ChangesInfo changes = changesInfo(undoStack());
+    UndoMacro::ChangesInfo changes;
 
     cmdState().reset();
     if (undo) {
+        changes = changesInfo(undoStack(), undo);
         undoStack()->undo(ed);
     } else {
         undoStack()->redo(ed);
+        changes = changesInfo(undoStack());
     }
+
     update(false);
     masterScore()->setPlaylistDirty();    // TODO: flag all individual operations
     updateSelection();
 
-    ScoreChangesRange range = changesRange();
-
-    if (range.changedItems.empty()) {
-        range.changedItems = std::move(changes.changedItems);
-    }
-
-    if (range.changedTypes.empty()) {
-        range.changedTypes = std::move(changes.changedObjectTypes);
-    }
-
-    if (range.changedPropertyIdSet.empty()) {
-        range.changedPropertyIdSet = std::move(changes.changedPropertyIdSet);
-    }
-
-    if (range.changedStyleIdSet.empty()) {
-        range.changedStyleIdSet = std::move(changes.changedStyleIdSet);
-    }
-
+    ScoreChangesRange range = buildChangesRange(cmdState(), changes);
     changesChannel().send(range);
 }
 
@@ -418,7 +410,10 @@ void Score::endCmd(bool rollback, bool layoutAllParts)
 
     update(false, layoutAllParts);
 
-    ScoreChangesRange range = changesRange();
+    ScoreChangesRange range;
+    if (!rollback) {
+        range = buildChangesRange(cmdState(), changesInfo(undoStack()));
+    }
 
     LOGD() << "Undo stack current macro child count: " << undoStack()->activeCommand()->childCount();
 
@@ -434,20 +429,6 @@ void Score::endCmd(bool rollback, bool layoutAllParts)
     if (!isCurrentCommandEmpty && !rollback) {
         changesChannel().send(range);
     }
-}
-
-ScoreChangesRange Score::changesRange() const
-{
-    const CmdState& cmdState = score()->cmdState();
-    UndoMacro::ChangesInfo changes = changesInfo(undoStack());
-    auto ticksRange = changedTicksRange(cmdState, changes.changedItems);
-
-    return { ticksRange.first, ticksRange.second,
-             cmdState.startStaff(), cmdState.endStaff(),
-             std::move(changes.changedItems),
-             std::move(changes.changedObjectTypes),
-             std::move(changes.changedPropertyIdSet),
-             std::move(changes.changedStyleIdSet) };
 }
 
 #ifndef NDEBUG
@@ -1088,7 +1069,7 @@ Segment* Score::setNoteRest(Segment* segment, track_idx_t track, NoteVal nval, F
     assert(segment->segmentType() == SegmentType::ChordRest);
     InputState& is = externalInputState ? (*externalInputState) : m_is;
 
-    bool isRest   = nval.pitch == -1;
+    bool isRest   = nval.isRest();
     Fraction tick = segment->tick();
     EngravingItem* nr   = nullptr;
     Tie* tie      = nullptr;
@@ -1451,19 +1432,21 @@ Fraction Score::makeGap(Segment* segment, track_idx_t track, const Fraction& _sd
 
 bool Score::makeGap1(const Fraction& baseTick, staff_idx_t staffIdx, const Fraction& len, int voiceOffset[VOICES])
 {
-    Segment* seg = tick2segment(baseTick, true, SegmentType::ChordRest);
-    if (!seg) {
-        LOGD("no segment to paste at tick %d", baseTick.ticks());
+    Measure* m = tick2measure(baseTick);
+    if (!m) {
+        LOGD() << "No measure to paste at tick " << baseTick.toString();
         return false;
     }
+
+    Segment* seg = m->undoGetSegment(SegmentType::ChordRest, baseTick);
     track_idx_t strack = staffIdx * VOICES;
     for (track_idx_t track = strack; track < strack + VOICES; track++) {
         if (voiceOffset[track - strack] == -1) {
             continue;
         }
         Fraction tick = baseTick + Fraction::fromTicks(voiceOffset[track - strack]);
-        Measure* m   = tick2measure(tick);
-        if ((track % VOICES) && !m->hasVoices(staffIdx)) {
+        Measure* tm   = tick2measure(tick);
+        if ((track % VOICES) && !tm->hasVoices(staffIdx)) {
             continue;
         }
 
@@ -1826,7 +1809,7 @@ void Score::changeCRlen(ChordRest* cr, const Fraction& dstF, bool fillWithRest)
     connectTies();
 
     if (elementToSelect) {
-        if (containsElement(elementToSelect)) {
+        if (canReselectItem(elementToSelect)) {
             select(elementToSelect, SelectType::SINGLE, 0);
         }
     }
@@ -2173,8 +2156,8 @@ void Score::toggleAccidental(AccidentalType at)
         m_is.setAccidentalType(at);
         m_is.setRest(false);
 
-        if (usingNoteEntryMethod(NoteEntryMethod::BY_DURATION)) {
-            applyAccidentalToInputNotes();
+        if (!m_is.notes().empty()) {
+            applyAccidentalToInputNotes(at);
         }
     } else {
         if (selection().isNone()) {
@@ -2187,23 +2170,24 @@ void Score::toggleAccidental(AccidentalType at)
     }
 }
 
-void Score::applyAccidentalToInputNotes()
+void Score::applyAccidentalToInputNotes(AccidentalType accidentalType)
 {
-    const AccidentalVal acc = Accidental::subtype2value(m_is.accidentalType());
-    const bool concertPitch = style().styleB(Sid::concertPitch);
-    NoteValList notes = m_is.notes();
+    NoteValList notes;
 
-    for (NoteVal& nval : notes) {
-        const int oldPitch = nval.pitch;
-        const int step = mu::engraving::pitch2step(oldPitch);
-        const int newTpc = mu::engraving::step2tpc(step, acc);
+    Position pos;
+    pos.segment = m_is.segment();
+    pos.staffIdx = m_is.staffIdx();
 
-        nval.pitch += static_cast<int>(acc);
+    for (const NoteVal& oldVal : m_is.notes()) {
+        pos.line = noteValToLine(oldVal, m_is.staff(), m_is.tick());
 
-        if (concertPitch) {
-            nval.tpc1 = newTpc;
+        bool error = false;
+        const NoteVal newVal = noteValForPosition(pos, accidentalType, error);
+
+        if (error) {
+            notes.push_back(oldVal);
         } else {
-            nval.tpc2 = newTpc;
+            notes.push_back(newVal);
         }
     }
 
@@ -2788,7 +2772,7 @@ void Score::cmdResetMeasuresLayout()
         }
 
         for (EngravingItem* item : mb->el()) {
-            if (item->isLayoutBreak()) {
+            if (item->isLayoutBreak() && !toLayoutBreak(item)->isSectionBreak()) {
                 itemsToRemove.push_back(item);
             }
         }
@@ -2965,6 +2949,7 @@ EngravingItem* Score::move(const String& cmd)
         case ElementType::HBOX:           // fallthrough
         case ElementType::VBOX:           // fallthrough
         case ElementType::TBOX:
+        case ElementType::FBOX:
             box = toBox(el);
             break;
         default:                                // on anything else, return failure
@@ -3189,10 +3174,13 @@ EngravingItem* Score::selectMove(const String& cmd)
     }
 
     ChordRest* el = nullptr;
+    ChordRestNavigateOptions options;
+    options.skipGrace = true;
+    options.skipMeasureRepeatRests = false;
     if (cmd == u"select-next-chord") {
-        el = nextChordRest(cr, true, false);
+        el = nextChordRest(cr, options);
     } else if (cmd == u"select-prev-chord") {
-        el = prevChordRest(cr, true, false);
+        el = prevChordRest(cr, options);
     } else if (cmd == u"select-next-measure") {
         el = nextMeasure(cr, true, true);
     } else if (cmd == u"select-prev-measure") {
@@ -4313,6 +4301,12 @@ void Score::cmdRealizeChordSymbols(bool literal, Voicing voicing, HDuration dura
             note->setNval(nval, tick);
         }
 
+        if (!seg->isChordRestType()) {
+            Segment* newCrSeg = seg->measure()->undoGetSegment(SegmentType::ChordRest, seg->tick());
+            newCrSeg->setTicks(seg->ticks());
+            seg = newCrSeg;
+        }
+
         setChord(this, seg, h->track(), chord, duration);     //add chord using template
         delete chord;
     }
@@ -4632,6 +4626,7 @@ void Score::cmdToggleLayoutBreak(LayoutBreakType type)
             case ElementType::HBOX:
             case ElementType::VBOX:
             case ElementType::TBOX:
+            case ElementType::FBOX:
                 mb = toMeasureBase(el);
                 break;
             default: {
@@ -5014,7 +5009,7 @@ bool Score::resolveNoteInputParams(int note, bool addFlag, NoteInputParams& out)
 //   cmdAddPitch
 ///   insert note or add note to chord
 //---------------------------------------------------------
-void Score::cmdAddPitch(const EditData& ed, const NoteInputParams& params, bool addFlag, bool insert)
+void Score::cmdAddPitch(const NoteInputParams& params, bool addFlag, bool insert)
 {
     InputState& is = inputState();
     if (!is.isValid()) {
@@ -5028,26 +5023,9 @@ void Score::cmdAddPitch(const EditData& ed, const NoteInputParams& params, bool 
     if (ds) {
         is.setDrumNote(params.drumPitch);
         is.setVoice(ds->voice(params.drumPitch));
-
-        if (is.segment()) {
-            Segment* seg = is.segment();
-            while (seg) {
-                if (seg->element(is.track())) {
-                    break;
-                }
-                seg = seg->prev(SegmentType::ChordRest);
-            }
-            if (seg) {
-                is.setSegment(seg);
-            } else {
-                is.setSegment(is.segment()->measure()->first(SegmentType::ChordRest));
-            }
-        }
     }
 
     cmdAddPitch(params.step, addFlag, insert);
-
-    ed.view()->adjustCanvasPosition(is.cr());
 }
 
 void Score::cmdAddPitch(int step, bool addFlag, bool insert)
