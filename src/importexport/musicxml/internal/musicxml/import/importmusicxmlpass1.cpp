@@ -1286,6 +1286,9 @@ Err MusicXmlParserPass1::parse()
 
     if (!found) {
         m_logger->logError(u"this is not a MusicXML score-partwise file, node <score-partwise> not found", &m_e);
+        if (!m_e.errorString().isEmpty()) {
+            m_errors += errorStringWithLocation(m_e.lineNumber(), m_e.columnNumber(), m_e.errorString()) + '\n';
+        }
         return Err::FileBadFormat;
     }
 
@@ -1402,15 +1405,17 @@ void MusicXmlParserPass1::scorePartwise()
             Part* spannedPart = il.at(pg->start + j);
             stavesSpan += spannedPart->nstaves();
 
-            if (pg->barlineSpan) {
-                for (Staff* spannedStaff : spannedPart->staves()) {
-                    if ((j == pg->span - 1) && (spannedStaff == spannedPart->staves().back())) {
-                        // Very last staff of group,
-                        continue;
-                    } else {
-                        spannedStaff->setBarLineSpan(true);
-                    }
+            if (!pg->barlineSpan) {
+                continue;
+            }
+
+            for (Staff* spannedStaff : spannedPart->staves()) {
+                if ((j == pg->span - 1) && (spannedStaff == spannedPart->staves().back())) {
+                    // Very last staff of group,
+                    continue;
                 }
+
+                spannedStaff->setBarLineSpan(true);
             }
         }
         // add bracket and set the span
@@ -1427,6 +1432,12 @@ void MusicXmlParserPass1::scorePartwise()
             if (pg->span == 1) {
                 partSet.insert(il.at(pg->start));
             }
+        }
+
+        Score* score = staff->score();
+        if (!score->isSystemObjectStaff(staff) && exporterSoftware() == MusicXmlExporterSoftware::FINALE
+            && configuration()->inferTextType()) {
+            score->addSystemObjectStaff(staff);
         }
     }
 

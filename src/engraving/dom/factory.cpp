@@ -75,6 +75,7 @@
 #include "ottava.h"
 #include "page.h"
 #include "palmmute.h"
+#include "parenthesis.h"
 #include "partialtie.h"
 #include "pedal.h"
 #include "pickscrape.h"
@@ -239,6 +240,7 @@ EngravingItem* Factory::doCreateItem(ElementType type, EngravingItem* parent)
     case ElementType::LAISSEZ_VIB:       return new LaissezVib(parent->isNote() ? toNote(parent) : dummy->note());
     case ElementType::PARTIAL_TIE:       return new PartialTie(parent->isNote() ? toNote(parent) : dummy->note());
     case ElementType::PARTIAL_LYRICSLINE: return new PartialLyricsLine(parent);
+    case ElementType::PARENTHESIS:       return new Parenthesis(parent->isSegment() ? toSegment(parent) : dummy->segment());
 
     case ElementType::LYRICSLINE:
     case ElementType::TEXTLINE_BASE:
@@ -256,7 +258,6 @@ EngravingItem* Factory::doCreateItem(ElementType type, EngravingItem* parent)
     case ElementType::STEM_SLASH:
     case ElementType::PAGE:
     case ElementType::BEAM:
-    case ElementType::BEAM_SEGMENT:
     case ElementType::HOOK:
     case ElementType::HAIRPIN_SEGMENT:
     case ElementType::OTTAVA_SEGMENT:
@@ -280,18 +281,12 @@ EngravingItem* Factory::doCreateItem(ElementType type, EngravingItem* parent)
     case ElementType::SHADOW_NOTE:
     case ElementType::SEGMENT:
     case ElementType::SYSTEM:
-    case ElementType::COMPOUND:
-    case ElementType::ELEMENT:
-    case ElementType::ELEMENT_LIST:
-    case ElementType::STAFF_LIST:
-    case ElementType::MEASURE_LIST:
     case ElementType::MAXTYPE:
     case ElementType::INVALID:
     case ElementType::PART:
     case ElementType::STAFF:
     case ElementType::SCORE:
     case ElementType::BRACKET_ITEM:
-    case ElementType::OSSIA:
     case ElementType::GRACE_NOTES_GROUP:
     case ElementType::ROOT_ITEM:
     case ElementType::FIGURED_BASS_ITEM:
@@ -413,8 +408,8 @@ MAKE_ITEM_IMPL(Clef, Segment)
 CREATE_ITEM_IMPL(DeadSlapped, ElementType::DEAD_SLAPPED, Rest, isAccessibleEnabled)
 COPY_ITEM_IMPL(DeadSlapped)
 
-CREATE_ITEM_IMPL(Fermata, ElementType::FERMATA, EngravingItem, isAccessibleEnabled)
-MAKE_ITEM_IMPL(Fermata, EngravingItem)
+CREATE_ITEM_IMPL(Fermata, ElementType::FERMATA, Segment, isAccessibleEnabled)
+MAKE_ITEM_IMPL(Fermata, Segment)
 
 CREATE_ITEM_IMPL(FiguredBass, ElementType::FIGURED_BASS, Segment, isAccessibleEnabled)
 MAKE_ITEM_IMPL(FiguredBass, Segment)
@@ -785,3 +780,6 @@ SystemLockIndicator* Factory::createSystemLockIndicator(System * parent, const S
 }
 
 COPY_ITEM_IMPL(SystemLockIndicator)
+
+CREATE_ITEM_IMPL(Parenthesis, ElementType::PARENTHESIS, Segment, isAccessibleEnabled);
+COPY_ITEM_IMPL(Parenthesis)
