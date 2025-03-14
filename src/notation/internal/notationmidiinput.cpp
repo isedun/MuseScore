@@ -149,7 +149,7 @@ void NotationMidiInput::doProcessEvents()
             notesItems.push_back(note);
         }
 
-        playbackController()->playElements(notesItems);
+        playbackController()->playElements(notesItems, true);
         m_notesReceivedChannel.send(notes);
     }
 
@@ -183,6 +183,7 @@ void NotationMidiInput::addNoteEventsToInputState()
 
     if (!notes.empty()) {
         INotationNoteInputPtr noteInput = m_notationInteraction->noteInput();
+        noteInput->setRestMode(false);
         noteInput->setInputNotes(notes);
 
         if (configuration()->isPlayPreviewNotesInInputByDuration()) {

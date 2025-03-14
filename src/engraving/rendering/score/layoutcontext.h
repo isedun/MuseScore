@@ -167,8 +167,11 @@ public:
 
     size_t ntracks() const;
 
+    size_t nmeasures() const;
+
     const Measure* tick2measure(const Fraction& tick) const;
     const Measure* firstMeasure() const;
+    const Measure* lastMeasure() const;
 
     const SpannerMap& spannerMap() const;
 
@@ -184,6 +187,7 @@ public:
 
     MeasureBase* first();
     Measure* firstMeasure();
+    Measure* lastMeasure();
     Measure* tick2measure(const Fraction& tick);
 
     ChordRest* findCR(Fraction tick, track_idx_t track);

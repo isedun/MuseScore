@@ -27,6 +27,8 @@
 #include "containers.h"
 
 #include "dom/beam.h"
+#include "dom/drumset.h"
+#include "dom/part.h"
 #include "dom/tremolotwochord.h"
 #include "dom/tremolosinglechord.h"
 #include "dom/chord.h"
@@ -154,7 +156,7 @@ void BeamLayout::layout1(Beam* item, LayoutContext& ctx)
         return;
     }
 
-    if (item->staff()->isDrumStaff(Fraction(0, 1))) {
+    if (item->staff()->isDrumStaff(item->tick())) {
         if (item->direction() != DirectionV::AUTO) {
             item->setUp(item->direction() == DirectionV::UP);
         } else if (item->isGrace()) {
@@ -165,15 +167,22 @@ void BeamLayout::layout1(Beam* item, LayoutContext& ctx)
             bool firstUp = false;
             bool firstChord = true;
             for (ChordRest* cr : item->elements()) {
-                if (cr->isChord()) {
-                    DirectionV crDirection = toChord(cr)->stemDirection();
-                    if (crDirection != DirectionV::AUTO) {
-                        item->setUp(crDirection == DirectionV::UP);
-                        break;
-                    } else if (firstChord) {
-                        firstUp = cr->up();
-                        firstChord = false;
-                    }
+                if (!cr->isChord()) {
+                    item->setUp(firstUp);
+                    continue;
+                }
+                Chord* chord = toChord(cr);
+                DirectionV crDirection = toChord(cr)->stemDirection();
+                if (crDirection != DirectionV::AUTO) {
+                    item->setUp(crDirection == DirectionV::UP);
+                    break;
+                }
+                if (firstChord) {
+                    const Staff* staff = item->staff();
+                    const Part* part = staff ? staff->part() : nullptr;
+                    const Drumset* ds = part ? part->instrument(item->tick())->drumset() : nullptr;
+                    firstUp = ds ? ds->stemDirection(chord->upNote()->pitch()) == DirectionV::UP : chord->up();
+                    firstChord = false;
                 }
                 item->setUp(firstUp);
             }
@@ -917,17 +926,13 @@ void BeamLayout::verticalAdjustBeamedRests(Rest* rest, Beam* beam, LayoutContext
         restToBeamPadding = 0.35 * spatium;
     }
 
-    Shape beamShape = beam->shape().translate(beam->pagePos());
-    beamShape.remove_if([&](ShapeElement& el) {
-        return el.item() && el.item()->isBeamSegment() && toBeamSegment(el.item())->isBeamlet;
-    });
+    const Shape beamShape = beam->shape().translate(beam->pagePos());
+    const Shape restShape = rest->shape().translate(rest->pagePos() - rest->offset());
+    const double minBeamToRestXDist = up && firstRest ? 0.1 * spatium : 0.0;
 
-    Shape restShape = rest->shape().translate(rest->pagePos() - rest->offset());
-    double minBeamToRestXDist = up && firstRest ? 0.1 * spatium : 0.0;
-
-    double restToBeamClearance = up
-                                 ? beamShape.verticalClearance(restShape, minBeamToRestXDist)
-                                 : restShape.verticalClearance(beamShape);
+    const double restToBeamClearance = up
+                                       ? beamShape.verticalClearance(restShape, minBeamToRestXDist)
+                                       : restShape.verticalClearance(beamShape);
 
     if (restToBeamClearance > restToBeamPadding) {
         return;
@@ -939,7 +944,7 @@ void BeamLayout::verticalAdjustBeamedRests(Rest* rest, Beam* beam, LayoutContext
         rest->verticalClearance().setBelow(restToBeamClearance);
     }
 
-    bool restIsLocked = rest->verticalClearance().locked();
+    const bool restIsLocked = rest->verticalClearance().locked();
     if (!restIsLocked) {
         double overlap = (restToBeamPadding - restToBeamClearance);
         double lineDistance = rest->staff()->lineDistance(rest->tick()) * spatium;

@@ -175,10 +175,12 @@ StyledFlickable {
                     }
 
                     StyledImage {
-                        forceHeight: 120
+                        forceHeight: 144
+                        horizontalPadding: 0
+                        verticalPadding: 0
                         source: pageModel.timeSigPlacement.value === 0 ? "timeSigImages/timesig-on_all_staves.png"
                               : pageModel.timeSigPlacement.value === 1 ? "timeSigImages/timesig-above_staves.png"
-                                                                              : "timeSigImages/timesig-across_staves.png"
+                                                                       : "timeSigImages/timesig-across_staves.png"
                     }
                 }
 
@@ -231,7 +233,7 @@ StyledFlickable {
                             FlatButton {
                                 Layout.alignment: Qt.AlignTop | Qt.AlignRight
                                 icon: IconCode.UNDO
-                                enabled: !(root.numeralStyle.isDefault && root.timeSigAlignment.isDefault
+                                enabled: !(root.numeralStyle.isDefault && (!root.timeSigAlignment || root.timeSigAlignment.isDefault)
                                            && root.timeSigScale.isDefault && root.scaleLock.isDefault
                                            && root.numDist.isDefault && root.yPos.isDefault)
                                 onClicked: pageModel.resetStyleAndSize()
@@ -247,7 +249,7 @@ StyledFlickable {
                                 Layout.preferredWidth: styleGroupBox.labelWidth
                                 horizontalAlignment: Text.AlignLeft
                                 text: pageModel.timeSigPlacement.value === 1 ? qsTrc("notation/editstyle/timesignatures", "Alignment with barlines:")
-                                                                                    : qsTrc("notation/editstyle/timesignatures", "Alignment across staves:")
+                                                                             : qsTrc("notation/editstyle/timesignatures", "Alignment across staves:")
                             }
 
                             RadioButtonGroup {
@@ -271,8 +273,12 @@ StyledFlickable {
                                         font.pixelSize: 16
                                     }
 
-                                    checked: root.timeSigAlignment.value === modelData.value
-                                    onToggled: root.timeSigAlignment.value = modelData.value
+                                    checked: root.timeSigAlignment ? root.timeSigAlignment.value === modelData.value : false
+                                    onToggled: function() {
+                                        if (root.timeSigAlignment) {
+                                            root.timeSigAlignment.value = modelData.value
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -294,6 +300,7 @@ StyledFlickable {
                                     decimals: 2
                                     measureUnitsSymbol: 'x'
                                     prefixIcon: IconCode.HORIZONTAL
+                                    minValue: 1.0
 
                                     currentValue: root.timeSigScale.value.width
                                     onValueEdited: function(newValue) {
@@ -310,6 +317,7 @@ StyledFlickable {
                                     decimals: 2
                                     measureUnitsSymbol: 'x'
                                     prefixIcon: IconCode.VERTICAL
+                                    minValue: 1.0
 
                                     currentValue: root.timeSigScale.value.height
                                     onValueEdited: function(newValue) {
@@ -427,10 +435,12 @@ StyledFlickable {
                         }
 
                         StyledImage {
-                            forceWidth: 120
+                            forceHeight: 94
+                            horizontalPadding: 0
+                            verticalPadding: 0
                             source: root.timeSigVsMargin.value === 0 ? "timeSigImages/timesig-courtesy-hang.png"
                                   : root.timeSigVsMargin.value === 1 ? "timeSigImages/timesig-courtesy-right_align.png"
-                                                                     : "timeSigImages/timesig-courtesy-create_space.png"
+                                                                     : "timeSigImages/timesig-courtesy-inset.png"
                         }
                     }
                 }
@@ -472,8 +482,234 @@ StyledFlickable {
                 }
             }
         }
+
+        StyledGroupBox {
+            Layout.fillWidth: true
+            title: qsTrc("notation/editstyle/timesignatures", "Clefs, key & time signatures at repeats and jumps")
+
+            component CourtesyShowAndParenToggle: GridLayout {
+                required property StyleItem showStyleItem
+                required property StyleItem parensStyleItem
+                property alias text: toggleText.text
+
+                flow: GridLayout.TopToBottom
+
+                required property string imageON
+                required property string imageOFF
+                required property string imageParens
+                width: parent.width
+                rowSpacing: 8
+
+                RowLayout {
+                    Layout.row: 0
+                    Layout.column: 0
+                    Layout.maximumWidth: 232
+                    Layout.preferredWidth: 232
+                    Layout.fillWidth: false
+                    ToggleButton {
+                        id: toggleButton
+                        checked: showStyleItem.value === true
+                        onToggled: {
+                            showStyleItem.value = !showStyleItem.value
+                        }
+                    }
+
+                    StyledTextLabel {
+                        id: toggleText
+                        Layout.alignment: Qt.AlignLeft
+                        horizontalAlignment: Text.AlignLeft
+                        Layout.maximumWidth: 232 - toggleButton.width
+                        Layout.preferredWidth: 232 - toggleButton.width
+                        wrapMode: Text.Wrap
+                    }
+                }
+
+
+                CheckBox {
+                    id: parensCheckbox
+                    Layout.row: 1
+                    Layout.column: 0
+                    text: qsTrc("notation/editstyle/timesignatures", "Use parentheses")
+                    checked: parensStyleItem.value === true
+                    onClicked: parensStyleItem.value = !parensStyleItem.value
+
+                    enabled: toggleButton.checked
+                }
+
+                StyledImage {
+                    id: image
+
+                    Layout.row: 0
+                    Layout.column: 1
+                    Layout.rowSpan: 3
+                    Layout.alignment: Qt.AlignRight
+
+                    forceHeight: 96
+                    horizontalPadding: 0
+                    verticalPadding: 0
+
+                    source: toggleButton.checked ? (parensCheckbox.checked ? imageParens : imageON) : imageOFF
+                }
+            }
+
+            ColumnLayout {
+                spacing: 12
+                anchors.fill: parent
+
+                StyledGroupBox {
+                    Layout.fillWidth: true
+
+                    title: qsTrc("notation/editstyle/timesignatures", "Changes that apply to both the repeat/jump and the subsequent measure")
+
+                    ColumnLayout {
+                        spacing: 8
+                        anchors.fill: parent
+
+                        CheckBox {
+                            text: qsTrc("notation/editstyle/timesignatures", "At repeats, only show changes before the barline")
+                            checked: pageModel.changesBeforeBarlineRepeats.value === true
+                            onClicked: pageModel.changesBeforeBarlineRepeats.value = !pageModel.changesBeforeBarlineRepeats.value
+                        }
+
+                        CheckBox {
+                            text: qsTrc("notation/editstyle/timesignatures", "At all other jumps, only show changes before the barline")
+                            checked: pageModel.changesBeforeBarlineOtherJumps.value === true
+                            onClicked: pageModel.changesBeforeBarlineOtherJumps.value = !pageModel.changesBeforeBarlineOtherJumps.value
+                        }
+                    }
+                }
+
+                StyledGroupBox {
+                    Layout.fillWidth: true
+
+                    title: qsTrc("notation/editstyle/timesignatures", "Changes that apply only after repeats and jumps")
+
+                    GridLayout {
+                        width: parent.width
+                        rowSpacing: 8
+
+                        RoundedRadioButton {
+                            id: clefBeforeRepeatsButton
+                            Layout.row: 0
+                            Layout.column: 0
+                            text: qsTrc("notation/editstyle/timesignatures", "Place clefs before repeats")
+                            checked: pageModel.placeClefsBeforeRepeats.value === true
+                            onToggled: pageModel.placeClefsBeforeRepeats.value = true
+                        }
+
+                        RoundedRadioButton {
+                            Layout.row: 1
+                            Layout.column: 0
+                            Layout.alignment: Qt.AlignTop
+                            text: qsTrc("notation/editstyle/timesignatures", "Place clefs after repeats")
+                            checked: pageModel.placeClefsBeforeRepeats.value === false
+                            onToggled: pageModel.placeClefsBeforeRepeats.value = false
+                        }
+
+                        StyledImage {
+                            id: clefBeforeImage
+                            Layout.row: 0
+                            Layout.column: 1
+                            Layout.rowSpan: 2
+                            Layout.alignment: Qt.AlignRight
+
+                            forceHeight: 64
+                            horizontalPadding: 0
+                            verticalPadding: 0
+                            source: clefBeforeRepeatsButton.checked ? "courtesyImages/clefs-before_repeat.png" : "courtesyImages/clefs-after_repeat.png"
+                        }
+
+                        CheckBox {
+                            id: betweenRepeatsCheckbox
+                            Layout.row: 2
+                            Layout.column: 0
+                            text: qsTrc("notation/editstyle/timesignatures", "Allow changes between end-start repeats")
+                            checked: pageModel.changesBetweenEndStartRepeat.value === true
+                            onClicked: pageModel.changesBetweenEndStartRepeat.value = !pageModel.changesBetweenEndStartRepeat.value
+                        }
+
+                        StyledImage {
+                            id: endStartRepeatImage
+                            Layout.row: 2
+                            Layout.column: 1
+                            Layout.rowSpan: 2
+                            Layout.alignment: Qt.AlignRight
+
+                            forceHeight: 64
+                            horizontalPadding: 0
+                            verticalPadding: 0
+
+                            source: clefBeforeRepeatsButton.checked ? (betweenRepeatsCheckbox.checked ? "courtesyImages/clefs-before_repeat-allow_changes"
+                                                                                                      : "courtesyImages/clefs-before_repeat-disallow_changes")
+                                                                    : (betweenRepeatsCheckbox.checked ? "courtesyImages/clefs-after_repeat-allow_changes"
+                                                                                                      : "courtesyImages/clefs-after_repeat-disallow_changes")
+                        }
+                    }
+                }
+
+                StyledGroupBox {
+                    Layout.fillWidth: true
+                    title: qsTrc("notation/editstyle/timesignatures", "Courtesies")
+                    width: parent.width
+
+                    ColumnLayout {
+                        width: parent.width
+                        spacing: 12
+
+                        CourtesyShowAndParenToggle {
+                            showStyleItem: pageModel.showCourtesiesRepeats
+                            parensStyleItem: pageModel.useParensRepeatCourtesies
+
+                            imageON: "courtesyImages/repeats-on"
+                            imageOFF: "courtesyImages/repeats-off"
+                            imageParens: "courtesyImages/repeats-on-parens"
+
+                            text: qsTrc("notation/editstyle/timesignatures", "Show at repeats")
+                        }
+
+                        CourtesyShowAndParenToggle {
+                            showStyleItem: pageModel.showCourtesiesOtherJumps
+                            parensStyleItem: pageModel.useParensOtherJumpCourtesies
+
+                            imageON: "courtesyImages/other_jumps-on"
+                            imageOFF: "courtesyImages/other_jumps-off"
+                            imageParens: "courtesyImages/other_jumps-on-parens"
+
+                            text: qsTrc("notation/editstyle/timesignatures", "Show at all other jumps")
+                        }
+
+                        CourtesyShowAndParenToggle {
+                            showStyleItem: pageModel.showCourtesiesAfterCancellingRepeats
+                            parensStyleItem: pageModel.useParensRepeatCourtesiesAfterCancelling
+
+                            imageON: "courtesyImages/cancel_repeat-on"
+                            imageOFF: "courtesyImages/cancel_repeat-off"
+                            imageParens: "courtesyImages/cancel_repeat-on-parens"
+
+                            text: qsTrc("notation/editstyle/timesignatures", "Show when cancelling a courtesy before repeats")
+                        }
+
+                        CourtesyShowAndParenToggle {
+                            showStyleItem: pageModel.showCourtesiesAfterCancellingOtherJumps
+                            parensStyleItem: pageModel.useParensOtherJumpCourtesiesAfterCancelling
+
+                            imageON: "courtesyImages/cancel_other-on"
+                            imageOFF: "courtesyImages/cancel_other-off"
+                            imageParens: "courtesyImages/cancel_other-on-parens"
+
+                            text: qsTrc("notation/editstyle/timesignatures", "Show when cancelling a courtesy before all other jumps")
+                        }
+
+                        CheckBox {
+                            Layout.column: 0
+                            Layout.row: 2
+                            text: qsTrc("notation", "Small parentheses")
+                            checked: pageModel.smallParens.value === true
+                            onClicked: pageModel.smallParens.value = !pageModel.smallParens.value
+                        }
+                    }
+                }
+            }
+        }
     }
 }
-
-
-

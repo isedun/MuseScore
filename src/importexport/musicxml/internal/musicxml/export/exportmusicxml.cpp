@@ -40,6 +40,7 @@
 #include "exportmusicxml.h"
 
 #include <math.h>
+#include <set>
 
 #include "containers.h"
 #include "realfn.h"
@@ -113,6 +114,7 @@
 #include "engraving/dom/stem.h"
 #include "engraving/dom/stringdata.h"
 #include "engraving/dom/system.h"
+#include "engraving/dom/tempo.h"
 #include "engraving/dom/tempotext.h"
 #include "engraving/dom/text.h"
 #include "engraving/dom/textlinebase.h"
@@ -415,7 +417,7 @@ private:
     void chord(Chord* chord, staff_idx_t staff, const std::vector<Lyrics*>& ll, bool useDrumset);
     void rest(Rest* chord, staff_idx_t staff, const std::vector<Lyrics*>& ll);
     void clef(staff_idx_t staff, const ClefType ct, const String& extraAttributes = u"");
-    void timesig(TimeSig* tsig);
+    void timesig(const TimeSig* tsig);
     void keysig(const KeySig* ks, ClefType ct, staff_idx_t staff = 0, bool visible = true);
     void barlineLeft(const Measure* const m, const track_idx_t track);
     void barlineMiddle(const BarLine* bl);
@@ -466,6 +468,7 @@ private:
     int m_tenths = 0;
     bool m_tboxesAboveWritten = false;
     bool m_tboxesBelowWritten = false;
+    std::vector<size_t> m_hiddenStaves;
     TrillHash m_trillStart;
     TrillHash m_trillStop;
     MusicXmlInstrumentMap m_instrMap;
@@ -995,19 +998,21 @@ void SlurHandler::doSlurStop(const Slur* s, Notations& notations, XmlWriter& xml
 
 static void glissando(const Glissando* gli, int number, bool start, Notations& notations, XmlWriter& xml)
 {
-    GlissandoType st = gli->glissandoType();
     String tagName;
-    switch (st) {
-    case GlissandoType::STRAIGHT:
-        tagName = u"slide line-type=\"solid\"";
-        break;
-    case GlissandoType::WAVY:
+    if (gli->glissandoType() == GlissandoType::STRAIGHT) {
+        switch (gli->lineStyle()) {
+        case LineType::SOLID:
+            tagName = u"slide line-type=\"solid\"";
+            break;
+        case LineType::DASHED:
+            tagName = u"slide line-type=\"dashed\"";
+            break;
+        case LineType::DOTTED:
+            tagName = u"slide line-type=\"dotted\"";
+            break;
+        }
+    } else {
         tagName = u"glissando line-type=\"wavy\"";
-        break;
-    default:
-        LOGD("unknown glissando subtype %d", int(st));
-        return;
-        break;
     }
     tagName += String(u" number=\"%1\" type=\"%2\"").arg(number).arg(start ? u"start" : u"stop");
     if (start) {
@@ -2167,13 +2172,13 @@ void ExportMusicXml::moveToTickIfNeed(const Fraction& t)
 //   timesig
 //---------------------------------------------------------
 
-void ExportMusicXml::timesig(TimeSig* tsig)
+void ExportMusicXml::timesig(const TimeSig* tsig)
 {
-    TimeSigType st = tsig->timeSigType();
-    Fraction ts = tsig->sig();
-    int z = ts.numerator();
-    int n = ts.denominator();
-    String ns = tsig->numeratorString();
+    const TimeSigType st = tsig->timeSigType();
+    const Fraction ts = tsig->sig();
+    const int z = ts.numerator();
+    const int n = ts.denominator();
+    const String ns = tsig->numeratorString();
 
     m_attr.doAttr(m_xml, true);
     XmlWriter::Attributes attrs;
@@ -2181,6 +2186,8 @@ void ExportMusicXml::timesig(TimeSig* tsig)
         attrs = { { "symbol", "common" } };
     } else if (st == TimeSigType::ALLA_BREVE) {
         attrs = { { "symbol", "cut" } };
+    } else if (!ns.empty() && tsig->denominatorString().empty()) {
+        attrs = { { "symbol", "single-number" } };
     }
     if (!tsig->visible()) {
         attrs.push_back({ "print-object", "no" });
@@ -3103,96 +3110,59 @@ static std::vector<String> symIdToArtic(const SymId sid)
     case SymId::articAccentAbove:
     case SymId::articAccentBelow:
         return { u"accent" };
-        break;
-
     case SymId::articStaccatoAbove:
     case SymId::articStaccatoBelow:
         return { u"staccato" };
-        break;
-
+    case SymId::articStaccatissimoAbove:
+    case SymId::articStaccatissimoBelow:
     case SymId::articStaccatissimoWedgeAbove:
     case SymId::articStaccatissimoWedgeBelow:
         return { u"staccatissimo" };
-        break;
-
     case SymId::articTenutoAbove:
     case SymId::articTenutoBelow:
         return { u"tenuto" };
-        break;
-
     case SymId::articMarcatoAbove:
     case SymId::articMarcatoBelow:
         return { u"strong-accent" };
-        break;
-
     case SymId::articTenutoStaccatoAbove:
     case SymId::articTenutoStaccatoBelow:
         return { u"detached-legato" };
-        break;
-
     case SymId::articSoftAccentAbove:
     case SymId::articSoftAccentBelow:
         return { u"soft-accent" };
-        break;
-
     case SymId::articSoftAccentStaccatoAbove:
     case SymId::articSoftAccentStaccatoBelow:
         return { u"soft-accent", u"staccato" };
-        break;
-
     case SymId::articSoftAccentTenutoAbove:
     case SymId::articSoftAccentTenutoBelow:
         return { u"soft-accent", u"tenuto" };
-        break;
-
     case SymId::articSoftAccentTenutoStaccatoAbove:
     case SymId::articSoftAccentTenutoStaccatoBelow:
         return { u"soft-accent", u"detached-legato" };
-        break;
-
     case SymId::articStressAbove:
     case SymId::articStressBelow:
         return { u"stress" };
-        break;
-
     case SymId::articUnstressAbove:
     case SymId::articUnstressBelow:
         return { u"unstress" };
-        break;
-
     case SymId::articAccentStaccatoAbove:
     case SymId::articAccentStaccatoBelow:
         return { u"accent", u"staccato" };
-        break;
-
     case SymId::articMarcatoStaccatoAbove:
     case SymId::articMarcatoStaccatoBelow:
         return { u"strong-accent", u"staccato" };
-        break;
-
     case SymId::articMarcatoTenutoAbove:
     case SymId::articMarcatoTenutoBelow:
         return { u"strong-accent", u"tenuto" };
-        break;
-
     case SymId::articTenutoAccentAbove:
     case SymId::articTenutoAccentBelow:
         return { u"tenuto", u"accent" };
-        break;
-
-    case SymId::articStaccatissimoAbove:
-    case SymId::articStaccatissimoBelow:
     case SymId::articStaccatissimoStrokeAbove:
     case SymId::articStaccatissimoStrokeBelow:
         return { u"spiccato" };
-        break;
-
     default:
-        ;                 // nothing
-        break;
+        return {}; // nothing
     }
-
-    return {};
 }
 
 //---------------------------------------------------------
@@ -3203,78 +3173,49 @@ static String symIdToOrnam(const SymId sid)
 {
     switch (sid) {
     case SymId::ornamentTrill:
-    case SymId::ornamentShake3:
-    case SymId::ornamentShakeMuffat1:
         return u"trill-mark";
-        break;
     case SymId::ornamentTurn:
         return u"turn";
-        break;
     case SymId::ornamentTurnInverted:
         return u"inverted-turn";
-        break;
     case SymId::ornamentTurnSlash:
         return u"turn slash=\"yes\"";
-        break;
     case SymId::ornamentTurnUp:
         return u"vertical-turn";
-        break;
     case SymId::ornamentTurnUpS:
         return u"inverted-vertical-turn";
-        break;
     case SymId::ornamentMordent:
         return u"mordent";
-        break;
     case SymId::ornamentShortTrill:
         return u"inverted-mordent";
-        break;
     case SymId::ornamentTremblement:
         return u"inverted-mordent long=\"yes\"";
-        break;
     case SymId::ornamentPrallMordent:
         return u"mordent long=\"yes\"";
-        break;
     case SymId::ornamentUpPrall:
         return u"inverted-mordent long=\"yes\" approach=\"below\"";
-        break;
     case SymId::ornamentPrecompMordentUpperPrefix:
         return u"inverted-mordent long=\"yes\" approach=\"above\"";
-        break;
     case SymId::ornamentUpMordent:
         return u"mordent long=\"yes\" approach=\"below\"";
-        break;
     case SymId::ornamentDownMordent:
         return u"mordent long=\"yes\" approach=\"above\"";
-        break;
     case SymId::ornamentPrallDown:
         return u"inverted-mordent long=\"yes\" departure=\"below\"";
-        break;
     case SymId::ornamentPrallUp:
         return u"inverted-mordent long=\"yes\" departure=\"above\"";
-        break;
     case SymId::ornamentLinePrall:
-        // MusicXML 3.0 does not distinguish between downprall and lineprall
+        // MusicXML 3.0 did not distinguish between downprall and lineprall
         return u"inverted-mordent long=\"yes\" approach=\"above\"";
-        break;
     case SymId::ornamentHaydn:
         return u"haydn";
-        break;
     case SymId::ornamentPrecompSlide:
         return u"schleifer";
-        break;
-    case SymId::ornamentTremblementCouperin:
-        return u"other-ornament smufl=\"ornamentTremblementCouperin\"";
-        break;
-    case SymId::ornamentPinceCouperin:
-        return u"other-ornament smufl=\"ornamentPinceCouperin\"";
-        break;
-
     default:
-        ;           // nothing
-        break;
+        // use other-ornament
+        const AsciiStringView name = SymNames::nameForSymId(sid);
+        return String(u"other-ornament smufl=\"%1\"").arg(String::fromAscii(name.ascii()));
     }
-
-    return String();
 }
 
 //---------------------------------------------------------
@@ -3286,66 +3227,53 @@ static String symIdToTechn(const SymId sid)
     switch (sid) {
     case SymId::stringsUpBow:
         return u"up-bow";
-        break;
     case SymId::stringsDownBow:
         return u"down-bow";
-        break;
     case SymId::stringsHarmonic:
         return u"harmonic";
-        break;
     case SymId::stringsThumbPosition:
     case SymId::stringsThumbPositionTurned:
         return u"thumb-position";
-        break;
     case SymId::doubleTongueAbove:
     case SymId::doubleTongueBelow:
         return u"double-tongue";
-        break;
     case SymId::tripleTongueAbove:
     case SymId::tripleTongueBelow:
         return u"triple-tongue";
-        break;
     case SymId::brassMuteClosed:
         return u"stopped";
-        break;
     case SymId::pluckedSnapPizzicatoAbove:
     case SymId::pluckedSnapPizzicatoBelow:
         return u"snap-pizzicato";
-        break;
+    case SymId::guitarLeftHandTapping:
+        return u"tap hand=\"left\"";
+    case SymId::guitarRightHandTapping:
+        return u"tap hand=\"right\"";
     case SymId::keyboardPedalHeel1:
     case SymId::keyboardPedalHeel2:
     case SymId::keyboardPedalHeel3:
         return u"heel";
-        break;
     case SymId::keyboardPedalToe1:
     case SymId::keyboardPedalToe2:
         return u"toe";
-        break;
     case SymId::pluckedWithFingernails:
         return u"fingernails";
-        break;
     case SymId::brassBend:
         return u"brass-bend";
-        break;
     case SymId::brassFlip:
         return u"brass-flip";
-        break;
     case SymId::brassSmear:
         return u"smear";
-        break;
     case SymId::brassMuteOpen:
         // return u"open-string";
         return u"open";
-        break;
     case SymId::brassMuteHalfClosed:
         return u"half-muted";
-        break;
     case SymId::brassHarmonMuteClosed:
     case SymId::brassHarmonMuteStemHalfLeft:
     case SymId::brassHarmonMuteStemHalfRight:
     case SymId::brassHarmonMuteStemOpen:
         return u"harmon-mute";
-        break;
     case SymId::windClosedHole:
     case SymId::windHalfClosedHole1:
     case SymId::windHalfClosedHole2:
@@ -3354,49 +3282,33 @@ static String symIdToTechn(const SymId sid)
         return u"hole";
     case SymId::guitarGolpe:
         return u"golpe";
-        break;
     case SymId::handbellsBelltree:
         return u"belltree";
-        break;
     case SymId::handbellsDamp3:
         return u"damp";
-        break;
     case SymId::handbellsEcho1:
         return u"echo";
-        break;
     case SymId::handbellsGyro:
         return u"gyro";
-        break;
     case SymId::handbellsHandMartellato:
         return u"hand martellato";
-        break;
     case SymId::handbellsMalletLft:
         return u"mallet lift";
-        break;
     case SymId::handbellsMalletBellOnTable:
         return u"mallet table";
-        break;
     case SymId::handbellsMartellato:
         return u"martellato";
-        break;
     case SymId::handbellsMartellatoLift:
         return u"martellato lift";
-        break;
     case SymId::handbellsMutedMartellato:
         return u"muted martellato";
-        break;
     case SymId::handbellsPluckLift:
         return u"pluck lift";
-        break;
     case SymId::handbellsSwing:
         return u"swing";
-        break;
     default:
-        ;           // nothing
-        break;
+        return String(); // nothing
     }
-
-    return String();
 }
 
 //---------------------------------------------------------
@@ -3486,6 +3398,7 @@ static void writeBreathMark(const Breath* const breath, XmlWriter& xml, Notation
             }
         }
         tagName += color2xml(breath);
+        tagName += ExportMusicXml::positioningAttributes(breath);
         if (breath->placement() == PlacementV::BELOW) {
             tagName += u" placement=\"below\"";
         } else if (ExportMusicXml::configuration()->exportMu3Compat()) {
@@ -3546,6 +3459,7 @@ void ExportMusicXml::chordAttributes(Chord* chord, Notations& notations, Technic
                 }
             }
             mxmlArtic += color2xml(a);
+            mxmlArtic += ExportMusicXml::positioningAttributes(a);
 
             notations.tag(m_xml, a);
             articulations.tag(m_xml);
@@ -3560,37 +3474,33 @@ void ExportMusicXml::chordAttributes(Chord* chord, Notations& notations, Technic
 
     // then the attributes whose elements are children of <ornaments>
     Ornaments ornaments;
-    for (const Articulation* a : na) {
-        if (!ExportMusicXml::canWrite(a)) {
+    for (const Articulation* art : na) {
+        if (!ExportMusicXml::canWrite(art)) {
             continue;
         }
-
-        SymId sid = a->symId();
+        if (!art->isOrnament()) {
+            continue;
+        }
+        const Ornament* ornam = toOrnament(art);
+        const SymId sid = ornam->symId();
         String mxmlOrnam = symIdToOrnam(sid);
 
-        if (!mxmlOrnam.empty()) {
-            String placement;
+        String placement;
+        if (!ornam->isStyled(Pid::ARTICULATION_ANCHOR) && ornam->anchor() != ArticulationAnchor::AUTO) {
+            placement = (ornam->anchor() == ArticulationAnchor::BOTTOM ? u"below" : u"above");
+        }
+        if (!placement.empty()) {
+            mxmlOrnam += String(u" placement=\"%1\"").arg(placement);
+        }
+        mxmlOrnam += color2xml(ornam);
 
-            if (!a->isStyled(Pid::ARTICULATION_ANCHOR) && a->anchor() != ArticulationAnchor::AUTO) {
-                placement = (a->anchor() == ArticulationAnchor::BOTTOM ? u"below" : u"above");
-            }
-            if (!placement.empty()) {
-                mxmlOrnam += String(u" placement=\"%1\"").arg(placement);
-            }
-            mxmlOrnam += color2xml(a);
-
-            notations.tag(m_xml, a);
-            ornaments.tag(m_xml);
-            m_xml.tagRaw(mxmlOrnam);
-            if (a->isOrnament()) {
-                const Ornament* ornam = toOrnament(a);
-                for (const Accidental* accidental : ornam->accidentalsAboveAndBelow()) {
-                    writeAccidental(m_xml, u"accidental-mark", accidental);
-                }
-            }
+        notations.tag(m_xml, ornam);
+        ornaments.tag(m_xml);
+        m_xml.tagRaw(mxmlOrnam);
+        for (const Accidental* accidental : ornam->accidentalsAboveAndBelow()) {
+            writeAccidental(m_xml, u"accidental-mark", accidental);
         }
     }
-
     tremoloSingleStartStop(chord, notations, ornaments, m_xml);
     wavyLineStartStop(chord, notations, ornaments, trillStart, trillStop);
     ornaments.etag(m_xml);
@@ -3690,7 +3600,6 @@ void ExportMusicXml::chordAttributes(Chord* chord, Notations& notations, Technic
 
         SymId sid = a->symId();
         if (symIdToArtic(sid).empty()
-            && symIdToOrnam(sid) == ""
             && symIdToTechn(sid) == ""
             && !isLaissezVibrer(sid)) {
             LOGD("unknown chord attribute %d %s", static_cast<int>(sid), muPrintable(a->translatedTypeUserName()));
@@ -4084,6 +3993,7 @@ static void writeFingering(XmlWriter& xml, Notations& notations, Technical& tech
                 attr += fontStyleToXML(static_cast<FontStyle>(f->getProperty(Pid::FONT_STYLE).toInt()), false);
             }
             attr += color2xml(f);
+            attr += ExportMusicXml::positioningAttributes(f);
 
             if (f->textStyleType() == TextStyleType::RH_GUITAR_FINGERING) {
                 xml.tagRaw(u"pluck" + attr, t);
@@ -5140,6 +5050,9 @@ void ExportMusicXml::tempoText(TempoText const* const text, staff_idx_t staff)
     // Format tempo with maximum 2 decimal places, because in some MuseScore files tempo is stored
     // imprecisely and this could cause rounding errors (e.g. 92 BPM would be saved as 91.9998).
     BeatsPerMinute bpm = text->tempo().toBPM();
+    if (text->isATempo() || text->isTempoPrimo()) {
+        bpm = m_score->tempomap()->tempo(text->tick().ticks()).toBPM();
+    }
     double bpmRounded = round(bpm.val * 100) / 100;
     m_xml.tag("sound", { { "tempo", bpmRounded } });
     m_xml.endElement();
@@ -5909,7 +5822,7 @@ void ExportMusicXml::textLine(TextLineBase const* const tl, staff_idx_t staff, c
 template<typename T>
 inline std::set<String>& operator<<(std::set<String>& s, const T& v)
 {
-    s.insert(v);
+    s.emplace(v);
     return s;
 }
 
@@ -6462,8 +6375,8 @@ void ExportMusicXml::repeatAtMeasureStop(const Measure* const m, track_idx_t str
 
 void ExportMusicXml::work(const MeasureBase* /*measure*/)
 {
-    String workTitle  = m_score->metaTag(u"workTitle");
-    String workNumber = m_score->metaTag(u"workNumber");
+    const String workTitle  = m_score->metaTag(u"workTitle");
+    const String workNumber = m_score->metaTag(u"workNumber");
     if (!(workTitle.isEmpty() && workNumber.isEmpty())) {
         m_xml.startElement("work");
         if (!workNumber.isEmpty()) {
@@ -7133,8 +7046,8 @@ void ExportMusicXml::identification(XmlWriter& xml, Score const* const score)
     xml.startElement("identification");
 
     // the creator types commonly found in MusicXML
-    std::vector<String> creators = { u"arranger", u"composer", u"lyricist", u"poet", u"translator" };
-    for (const String& type : creators) {
+    std::set<String> metaTagNames = { u"arranger", u"composer", u"lyricist", u"poet", u"translator" };
+    for (const String& type : metaTagNames) {
         String creator = score->metaTag(type);
         if (!creator.isEmpty()) {
             xml.tag("creator", { { "type", type } }, creator);
@@ -7143,6 +7056,7 @@ void ExportMusicXml::identification(XmlWriter& xml, Score const* const score)
 
     if (!score->metaTag(u"copyright").isEmpty()) {
         xml.tag("rights", score->metaTag(u"copyright"));
+        metaTagNames.emplace(u"copyright");
     }
 
     xml.startElement("encoding");
@@ -7151,7 +7065,7 @@ void ExportMusicXml::identification(XmlWriter& xml, Score const* const score)
         xml.tag("software", String(u"MuseScore 0.7.0"));
         xml.tag("encoding-date", String(u"2007-09-10"));
     } else {
-        xml.tag("software", String(u"MuseScore ") + application()->version().toString());
+        xml.tag("software", String(u"MuseScore Studio ") + application()->version().toString());
         xml.tag("encoding-date", muse::Date::currentDate().toString(muse::DateFormat::ISODate));
     }
 
@@ -7174,6 +7088,22 @@ void ExportMusicXml::identification(XmlWriter& xml, Score const* const score)
 
     if (!score->metaTag(u"source").isEmpty()) {
         xml.tag("source", score->metaTag(u"source"));
+        metaTagNames.emplace(u"source");
+    }
+
+    if (!MScore::debugMode) {
+        // do not write miscellaneous in debug mode
+        metaTagNames.insert({ u"workTitle", u"workNumber", u"movementTitle", u"movementNumber", u"originalFormat" });
+        xml.startElement("miscellaneous");
+        for (const auto& metaTag : score->metaTags()) {
+            auto search = metaTagNames.find(metaTag.first);
+            if (search != metaTagNames.end()) {
+                continue;
+            } else if (!metaTag.second.isEmpty()) {
+                xml.tag("miscellaneous-field", { { "name", metaTag.first } }, metaTag.second);
+            }
+        }
+        xml.endElement();
     }
 
     xml.endElement();
@@ -7420,6 +7350,10 @@ void ExportMusicXml::print(const Measure* const m, const int partNr, const int f
                 if (prevStaffNr == muse::nidx) {
                     continue;
                 }
+                if (!system->staff(staffNr)->show()) {
+                    m_hiddenStaves.push_back(staffIdx);
+                    continue;
+                }
                 const RectF& prevBbox = system->staff(prevStaffNr)->bbox();
                 const double staffDist = system->staff(staffNr)->bbox().y() - prevBbox.y() - prevBbox.height();
 
@@ -7427,6 +7361,8 @@ void ExportMusicXml::print(const Measure* const m, const int partNr, const int f
                     m_xml.startElement("staff-layout", { { "number", staffIdx + 1 } });
                     m_xml.tag("staff-distance", String::number(getTenthsFromDots(staffDist), 2));
                     m_xml.endElement();
+                } else {
+                    m_hiddenStaves.push_back(staffIdx);
                 }
             }
 
@@ -7602,7 +7538,7 @@ static void addChordPitchesToSet(const Chord* c, pitchSet& set)
 {
     for (const Note* note : c->notes()) {
         LOGD("chord %p note %p pitch %d", c, note, note->pitch() + 1);
-        set.insert(note->pitch());
+        set.emplace(note->pitch());
     }
 }
 
@@ -7885,25 +7821,41 @@ static void clampMusicXmlOctave(int& octave)
  Write the staff details for \a part to \a xml.
  */
 
-static void writeStaffDetails(XmlWriter& xml, const Part* part)
+static void writeStaffDetails(XmlWriter& xml, const Part* part, const std::vector<size_t> hiddenStaves)
 {
     const Instrument* instrument = part->instrument();
-    size_t staves = part->nstaves();
+    const size_t staves = part->nstaves();
 
     // staff details
-    // TODO: decide how to handle linked regular / TAB staff
-    //       currently exported as a two staff part ...
     for (size_t i = 0; i < staves; i++) {
         Staff* st = part->staff(i);
         const double mag = st->staffMag(Fraction(0, 1));
-        if (st->lines(Fraction(0, 1)) != 5 || st->isTabStaff(Fraction(0, 1)) || !muse::RealIsEqual(mag, 1.0) || !st->show()) {
+        bool hidden = false;
+        if (!st->show()) {
+            hidden = true;
+        } else {
+            for (size_t staffIdx : hiddenStaves) {
+                if (i == staffIdx) {
+                    hidden = true;
+                }
+            }
+        }
+        const Color lineColor = st->color(Fraction(0, 1));
+        const bool invis = st->isLinesInvisible(Fraction(0, 1));
+        const bool needsLineDetails = invis || lineColor != engravingConfiguration()->defaultColor();
+        if (st->lines(Fraction(0, 1)) != 5 || st->isTabStaff(Fraction(0, 1)) || !muse::RealIsEqual(mag, 1.0)
+            || hidden || needsLineDetails) {
             XmlWriter::Attributes attributes;
             if (staves > 1) {
-                attributes.push_back({ "number", i + 1 });
+                attributes.emplace_back(std::make_pair("number", i + 1));
             }
-            if (!st->show()) {
-                attributes.push_back({ "print-object", "no" });
+            if (hidden) {
+                attributes.emplace_back(std::make_pair("print-object", "no"));
+                if (st->cutaway()) {
+                    attributes.emplace_back(std::make_pair("print-spacing", "yes"));
+                }
             }
+
             xml.startElement("staff-details", attributes);
 
             if (i > 0 && st->links() && st->links()->contains(part->staff(i - 1))) {
@@ -7911,6 +7863,19 @@ static void writeStaffDetails(XmlWriter& xml, const Part* part)
             }
 
             xml.tag("staff-lines", st->lines(Fraction(0, 1)));
+            if (needsLineDetails) {
+                for (int lineIdx = 0; lineIdx < st->lines(Fraction(0, 1)); ++lineIdx) {
+                    String ld = String(u"line-detail line=\"%1\"").arg(lineIdx + 1);
+                    if (lineColor != engravingConfiguration()->defaultColor()) {
+                        ld += String(u" color=\"%1\"").arg(String::fromStdString(lineColor.toString()));
+                    }
+                    if (invis) {
+                        ld += u" print-object=\"no\"";
+                    }
+                    xml.tagRaw(ld);
+                }
+            }
+
             if (st->isTabStaff(Fraction(0, 1)) && instrument->stringData()) {
                 std::vector<instrString> l = instrument->stringData()->stringList();
                 for (size_t ii = 0; ii < l.size(); ii++) {
@@ -8245,6 +8210,14 @@ void ExportMusicXml::writeMeasureTracks(const Measure* const m,
                 const track_idx_t endtrack = staff2track(spannerStaff + 1);
                 spannerStop(this, starttrack, endtrack, seg->tick(), partRelStaffNo, spannersStopped);
 
+                // We check if there are additional annotations
+                for (EngravingItem* annotation : seg->annotations()) {
+                    if (annotation->track() != track || !annotation->isTextBase()) {
+                        continue;
+                    }
+                    // Just to include them
+                    annotations(this, strack, etrack, track, partRelStaffNo, seg);
+                }
                 continue;
             }
             EngravingItem* const el = seg->element(track);
@@ -8445,9 +8418,24 @@ void ExportMusicXml::writeMeasure(const Measure* const m,
 
     // output attributes with the first actual measure (pickup or regular) only
     if (isFirstActualMeasure) {
-        writeStaffDetails(m_xml, part);
+        writeStaffDetails(m_xml, part, m_hiddenStaves);
         writeInstrumentDetails(part->instrument(), m_score->style().styleB(Sid::concertPitch));
+    } else {
+        for (size_t staffIdx : m_hiddenStaves) {
+            m_attr.doAttr(m_xml, true);
+            XmlWriter::Attributes attributes;
+            if (staves > 1) {
+                attributes.emplace_back(std::make_pair("number", staffIdx + 1));
+            }
+            attributes.emplace_back(std::make_pair("print-object", "no"));
+            if (part->staff(staffIdx)->cutaway()) {
+                attributes.emplace_back(std::make_pair("print-spacing", "yes"));
+            }
+            m_xml.tag("staff-details", attributes);
+            m_attr.doAttr(m_xml, false);
+        }
     }
+    m_hiddenStaves.clear();
 
     // output attribute at start of measure: measure-style
     measureStyle(m_xml, m_attr, m, partIndex);
