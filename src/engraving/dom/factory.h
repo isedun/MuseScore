@@ -93,8 +93,8 @@ public:
     static Clef* copyClef(const Clef& src);
     static std::shared_ptr<Clef> makeClef(Segment* parent);
 
-    static Fermata* createFermata(EngravingItem* parent, bool isAccessibleEnabled = true);
-    static std::shared_ptr<Fermata> makeFermata(EngravingItem* parent);
+    static Fermata* createFermata(Segment* parent, bool isAccessibleEnabled = true);
+    static std::shared_ptr<Fermata> makeFermata(Segment* parent);
 
     static FiguredBass* createFiguredBass(Segment* parent, bool isAccessibleEnabled = true);
     static std::shared_ptr<FiguredBass> makeFiguredBass(Segment* parent);
@@ -142,6 +142,9 @@ public:
     static std::shared_ptr<NoteLine> makeNoteLine(Note* parent);
 
     static Page* createPage(RootItem* parent, bool isAccessibleEnabled = true);
+
+    static Parenthesis* createParenthesis(Segment* parent, bool isAccessibleEnabled = true);
+    static Parenthesis* copyParenthesis(const Parenthesis& src);
 
     static PartialTie* createPartialTie(Note* parent, bool isAccessibleEnabled = true);
     static PartialTie* copyPartialTie(const PartialTie& src);

@@ -76,6 +76,8 @@ public:
     EngravingItem* findElementToSnapBefore(bool ignoreInvisible = true) const;
     EngravingItem* findElementToSnapAfter(bool ignoreInvisible = true) const;
 
+    void endEditDrag(EditData& ed) override;
+
 private:
     TextBase* findStartDynamicOrExpression(bool ignoreInvisible = true) const;
     TextBase* findEndDynamicOrExpression(bool ignoreInvisible = true) const;
@@ -114,6 +116,9 @@ public:
 
     DynamicType dynamicTypeFrom() const;
     DynamicType dynamicTypeTo() const;
+
+    const Dynamic* dynamicSnappedBefore() const;
+    const Dynamic* dynamicSnappedAfter() const;
 
     HairpinType hairpinType() const { return m_hairpinType; }
     void setHairpinType(HairpinType val);

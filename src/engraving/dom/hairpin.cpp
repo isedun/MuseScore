@@ -326,6 +326,16 @@ EngravingItem* HairpinSegment::findElementToSnapAfter(bool ignoreInvisible) cons
     return findEndDynamicOrExpression(ignoreInvisible);
 }
 
+void HairpinSegment::endEditDrag(EditData& ed)
+{
+    if (ed.isHairpinDragCreatedFromDynamic) {
+        undoResetProperty(Pid::OFFSET);
+        undoResetProperty(Pid::OFFSET2);
+    }
+
+    LineSegment::endEditDrag(ed);
+}
+
 TextBase* HairpinSegment::findStartDynamicOrExpression(bool ignoreInvisible) const
 {
     Fraction refTick = hairpin()->tick();
@@ -518,6 +528,36 @@ DynamicType Hairpin::dynamicTypeTo() const
 
     muse::ByteArray ba = endText().toAscii();
     return TConv::dynamicType(ba.constChar());
+}
+
+const Dynamic* Hairpin::dynamicSnappedBefore() const
+{
+    const LineSegment* seg = frontSegment();
+    if (!seg) {
+        return nullptr;
+    }
+
+    const EngravingItem* item = seg->ldata()->itemSnappedBefore();
+    if (!item || !item->isDynamic()) {
+        return nullptr;
+    }
+
+    return toDynamic(item);
+}
+
+const Dynamic* Hairpin::dynamicSnappedAfter() const
+{
+    const LineSegment* seg = backSegment();
+    if (!seg) {
+        return nullptr;
+    }
+
+    const EngravingItem* item = seg->ldata()->itemSnappedAfter();
+    if (!item || !item->isDynamic()) {
+        return nullptr;
+    }
+
+    return toDynamic(item);
 }
 
 //---------------------------------------------------------

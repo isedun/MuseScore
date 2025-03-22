@@ -1275,10 +1275,8 @@ bool ChordLayout::isChordPosBelowBeam(Chord* item, Beam* beam)
     Note* baseNote = item->up() ? item->downNote() : item->upNote();
     double noteY = baseNote->pagePos().y();
 
-    ChordRest* startCR = beam->elements().front();
-    ChordRest* endCR = beam->elements().back();
-    PointF startAnchor = BeamLayout::chordBeamAnchor(beam, startCR, ChordBeamAnchorType::Start);
-    PointF endAnchor = BeamLayout::chordBeamAnchor(beam, endCR, ChordBeamAnchorType::End);
+    PointF startAnchor = beam->startAnchor();
+    PointF endAnchor = beam->endAnchor();
 
     if (item == beam->elements().front()) {
         return noteY > startAnchor.y();
@@ -3508,7 +3506,7 @@ void ChordLayout::fillShape(const MMRest* item, MMRest::LayoutData* ldata, const
 
     double vStrokeHeight = conf.styleMM(Sid::mmRestHBarVStrokeHeight);
     shape.add(RectF(0.0, -(vStrokeHeight * .5), ldata->restWidth, vStrokeHeight), item);
-    if (item->numberVisible()) {
+    if (item->shouldShowNumber()) {
         shape.add(item->numberRect().translated(item->numberPos()), item);
     }
 

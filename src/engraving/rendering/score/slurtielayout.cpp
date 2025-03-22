@@ -42,6 +42,7 @@
 #include "dom/measure.h"
 #include "dom/guitarbend.h"
 #include "dom/laissezvib.h"
+#include "dom/parenthesis.h"
 #include "dom/partialtie.h"
 
 #include "tlayout.h"
@@ -143,10 +144,11 @@ SpannerSegment* SlurTieLayout::layoutSystem(Slur* item, System* system, LayoutCo
                     }
                 }
             }
-            if (!adjustedVertically && sc->notes()[0]->tieBack() && !sc->notes()[0]->tieBack()->isInside()
-                && sc->notes()[0]->tieBack()->up() == item->up()) {
+            Tie* tieBack = sc->notes()[0]->tieBack();
+            if (!adjustedVertically && tieBack && (!tieBack->isInside() || tieBack->isPartialTie())
+                && tieBack->up() == item->up()) {
                 // there is a tie that ends on this chordrest
-                tie = sc->notes()[0]->tieBack();
+                tie = tieBack;
                 if (!tie->segmentsEmpty()) {
                     endPoint = tie->segmentAt(static_cast<int>(tie->nsegments()) - 1)->ups(Grip::END).pos();
                     if (std::abs(endPoint.y() - p1.y()) < tieClearance) {
@@ -184,7 +186,7 @@ SpannerSegment* SlurTieLayout::layoutSystem(Slur* item, System* system, LayoutCo
             Tie* tie = nullptr;
             PointF endPoint;
             Tie* tieBack = c->notes()[0]->tieBack();
-            if (tieBack && !tieBack->isInside() && tieBack->up() == item->up()) {
+            if (tieBack && (tieBack->isPartialTie() || !tieBack->isInside()) && tieBack->up() == item->up()) {
                 // there is a tie that ends on this chordrest
                 if (!tieBack->segmentsEmpty()) { //Checks for spanner segment esxists
                     tie = tieBack;
@@ -235,7 +237,7 @@ SpannerSegment* SlurTieLayout::layoutSystem(Slur* item, System* system, LayoutCo
                 }
             }
             Tie* tieFor = ec->notes()[0]->tieFor();
-            if (!adjustedVertically && tieFor && !tieFor->isInside() && tieFor->up() == item->up()) {
+            if (!adjustedVertically && tieFor && (tieFor->isPartialTie() || !tieFor->isInside()) && tieFor->up() == item->up()) {
                 // there is a tie that starts on this chordrest
                 if (!tieFor->segmentsEmpty() && std::abs(tieFor->frontSegment()->ups(Grip::START).pos().y() - p2.y()) < tieClearance) {
                     p2.rx() -= horizontalTieClearance;
@@ -275,7 +277,7 @@ SpannerSegment* SlurTieLayout::layoutSystem(Slur* item, System* system, LayoutCo
             Tie* tie = nullptr;
             PointF endPoint;
             Tie* tieFor = c->notes()[0]->tieFor();
-            if (tieFor && (!tieFor->isInside() || outgoingPartialSlur) && tieFor->up() == item->up()) {
+            if (tieFor && (tieFor->isPartialTie() || !tieFor->isInside()) && tieFor->up() == item->up()) {
                 // there is a tie that starts on this chordrest
                 if (!tieFor->segmentsEmpty()) { //Checks is spanner segment exists
                     tie = tieFor;
@@ -1851,31 +1853,47 @@ void SlurTieLayout::setPartialTieEndPos(PartialTie* item, SlurTiePos& sPos)
     const Segment* seg = chord->segment();
     const Measure* measure = seg->measure();
     const System* system = measure->system();
-    double width = item->style().styleS(Sid::minHangingTieLength).val() * item->spatium();
 
     if (seg->measure()->isFirstInSystem() && !outgoing) {
         sPos.p1 = PointF((system ? system->firstNoteRestSegmentX(true) : 0), sPos.p2.y());
         return;
     }
 
-    const Segment* adjSeg = outgoing ? seg->next() : seg->prev();
-    while (adjSeg && (!adjSeg->isActive() || !adjSeg->enabled())) {
-        adjSeg = outgoing ? seg->next() : seg->prev();
+    auto shouldSkipSegment = [](const Segment* adjSeg, staff_idx_t staff) {
+        bool inactiveOrInvisible = !adjSeg->isActive() || !adjSeg->enabled() || adjSeg->allElementsInvisible()
+                                   || !adjSeg->hasElements(staff);
+        bool isAboveStaff = adjSeg->isBreathType() || adjSeg->hasTimeSigAboveStaves();
+        return inactiveOrInvisible || isAboveStaff;
+    };
+
+    const Segment* adjSeg = outgoing ? seg->next1() : seg->prev1();
+    while (adjSeg && shouldSkipSegment(adjSeg, item->vStaffIdx())) {
+        adjSeg = outgoing ? adjSeg->next1() : adjSeg->prev1();
     }
 
+    double widthToSegment = 0.0;
     if (adjSeg) {
         EngravingItem* element = adjSeg->element(staff2track(item->vStaffIdx()));
+        track_idx_t strack = track2staff(item->track());
+        track_idx_t etrack = strack + VOICES - 1;
+        for (EngravingItem* paren : adjSeg->findAnnotations(ElementType::PARENTHESIS, strack, etrack)) {
+            if ((outgoing && toParenthesis(paren)->direction() == DirectionH::LEFT)
+                || (!outgoing && toParenthesis(paren)->direction() == DirectionH::RIGHT)) {
+                element = paren;
+                break;
+            }
+        }
+
         const double elementWidth = element ? element->width() : 0.0;
-        double widthToSegment = outgoing ? adjSeg->xPosInSystemCoords() - sPos.p1.x() : sPos.p2.x()
-                                - (adjSeg->xPosInSystemCoords() + elementWidth);
+        const double elPos = adjSeg->xPosInSystemCoords() + (element ? element->pos().x() + element->shape().bbox().x() : 0.0);
+        widthToSegment = outgoing ? elPos - sPos.p1.x() : sPos.p2.x() - (elPos + elementWidth);
         widthToSegment -= 0.25 * item->spatium();
-        width = std::max(widthToSegment, width);
     }
 
     if (outgoing) {
-        sPos.p2 = PointF(sPos.p1.x() + width, sPos.p1.y());
+        sPos.p2 = PointF(sPos.p1.x() + widthToSegment, sPos.p1.y());
     } else {
-        sPos.p1 = PointF(sPos.p2.x() - width, sPos.p2.y());
+        sPos.p1 = PointF(sPos.p2.x() - widthToSegment, sPos.p2.y());
     }
 }
 

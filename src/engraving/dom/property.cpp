@@ -83,6 +83,7 @@ static constexpr PropertyMetaData propertyList[] = {
     { Pid::ARTICULATION_ANCHOR,     false, "anchor",                P_TYPE::INT,                PropertyGroup::POSITION,        DUMMY_QT_TR_NOOP("propertyName", "anchor") },
 
     { Pid::DIRECTION,               false, "direction",             P_TYPE::DIRECTION_V,        PropertyGroup::POSITION,        DUMMY_QT_TR_NOOP("propertyName", "direction") },
+    { Pid::HORIZONTAL_DIRECTION,    false, "horizontalDirection",   P_TYPE::DIRECTION_H,        PropertyGroup::POSITION,        DUMMY_QT_TR_NOOP("propertyName", "horizontal direction") },
     { Pid::STEM_DIRECTION,          false, "StemDirection",         P_TYPE::DIRECTION_V,        PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "stem direction") },
     { Pid::NO_STEM,                 false, "noStem",                P_TYPE::INT,                PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "no stem") },
     { Pid::SLUR_DIRECTION,          false, "up",                    P_TYPE::DIRECTION_V,        PropertyGroup::POSITION,        DUMMY_QT_TR_NOOP("propertyName", "up") },
@@ -133,6 +134,13 @@ static constexpr PropertyMetaData propertyList[] = {
     { Pid::IMAGE_HEIGHT,            false, "imageHeight",           P_TYPE::REAL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "imageHeight") },
     { Pid::IMAGE_WIDTH,             false, "imageWidth",            P_TYPE::REAL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "imageWidth") },
     { Pid::IMAGE_FRAMED,            false, "imageFramed",           P_TYPE::BOOL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "imageFramed") },
+
+    { Pid::FRET_FRAME_TEXT_SCALE,               false, "fretFrameTextScale",            P_TYPE::REAL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "text scale") },
+    { Pid::FRET_FRAME_DIAGRAM_SCALE,            false, "fretFrameDiagramScale",         P_TYPE::REAL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "diagram scale") },
+    { Pid::FRET_FRAME_COLUMN_GAP,               false, "fretFrameColumnGap",            P_TYPE::SPATIUM,            PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "column gap") },
+    { Pid::FRET_FRAME_ROW_GAP,                  false, "fretFrameRowGap",               P_TYPE::SPATIUM,            PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "row gap") },
+    { Pid::FRET_FRAME_CHORDS_PER_ROW,           false, "fretFrameChordsPerRow",         P_TYPE::INT,                PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "chords per row") },
+    { Pid::FRET_FRAME_H_ALIGN,                  false, "fretFrameHorizontalAlign",      P_TYPE::INT,                PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "horizontal alignment") },
 
     { Pid::SCALE,                   false, "scale",                 P_TYPE::SCALE,              PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "scale") },
     { Pid::LOCK_ASPECT_RATIO,       false, "lockAspectRatio",       P_TYPE::BOOL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "aspect ratio locked") },
@@ -199,8 +207,8 @@ static constexpr PropertyMetaData propertyList[] = {
     { Pid::MEASURE_NUMBER_MODE,     false, "measureNumberMode",     P_TYPE::INT,                PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "measure number mode") },
 
     { Pid::GLISS_TYPE,              false, "subtype",               P_TYPE::INT,                PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "subtype") },
-    { Pid::GLISS_TEXT,              false, 0,                       P_TYPE::STRING,             PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "text") },
-    { Pid::GLISS_SHOW_TEXT,         false, 0,                       P_TYPE::BOOL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "showing text") },
+    { Pid::GLISS_TEXT,              false, "text",                  P_TYPE::STRING,             PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "text") },
+    { Pid::GLISS_SHOW_TEXT,         false, "glissandoShowText",     P_TYPE::BOOL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "showing text") },
     { Pid::GLISS_STYLE,             true,  "glissandoStyle",        P_TYPE::GLISS_STYLE,        PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "glissando style") },
     { Pid::GLISS_SHIFT,             false, "glissandoShift",        P_TYPE::BOOL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "glissando shift") },
     { Pid::GLISS_EASEIN,            false, "easeInSpin",            P_TYPE::INT,                PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName","ease in") },
@@ -447,6 +455,7 @@ static constexpr PropertyMetaData propertyList[] = {
     { Pid::SYMBOL_ANGLE,            false, "symbolAngle",           P_TYPE::REAL,               PropertyGroup::APPEARANCE,      DUMMY_QT_TR_NOOP("propertyName", "symbol angle") },
 
     { Pid::APPLY_TO_ALL_STAVES,     false, "applyToAllStaves",      P_TYPE::BOOL,               PropertyGroup::NONE,            DUMMY_QT_TR_NOOP("propertyName", "apply to all staves") },
+    { Pid::IS_COURTESY,             false, "isCourtesy",            P_TYPE::BOOL,               PropertyGroup::NONE,            DUMMY_QT_TR_NOOP("propertyName", "is courtesy") },
 
     { Pid::END,                     false, "++end++",               P_TYPE::INT,                PropertyGroup::NONE,            DUMMY_QT_TR_NOOP("propertyName", "<invalid property>") }
 };

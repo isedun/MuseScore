@@ -98,6 +98,7 @@
 #include "dom/ottava.h"
 
 #include "dom/page.h"
+#include "dom/parenthesis.h"
 #include "dom/partialtie.h"
 #include "dom/palmmute.h"
 #include "dom/part.h"
@@ -306,6 +307,8 @@ void TDraw::drawItem(const EngravingItem* item, Painter* painter)
         break;
 
     case ElementType::PAGE:                 draw(item_cast<const Page*>(item), painter);
+        break;
+    case ElementType::PARENTHESIS:          draw(item_cast<const Parenthesis*>(item), painter);
         break;
     case ElementType::PARTIAL_TIE_SEGMENT:  draw(item_cast<const PartialTieSegment*>(item), painter);
         break;
@@ -2224,7 +2227,7 @@ void TDraw::draw(const MMRest* item, Painter* painter)
             pen.setWidthF(hBarThickness);
             painter->setPen(pen);
             double halfHBarThickness = hBarThickness * .5;
-            if (item->numberVisible() // avoid painting line through number
+            if (item->shouldShowNumber() // avoid painting line through number
                 && item->style().styleB(Sid::mmRestNumberMaskHBar)
                 && numberBox.bottom() >= -halfHBarThickness
                 && numberBox.top() <= halfHBarThickness) {
@@ -2434,6 +2437,32 @@ void TDraw::draw(const Page* item, Painter* painter)
         drawHeaderFooter(painter, 4, s2);
         drawHeaderFooter(painter, 5, s3);
     }
+}
+
+void TDraw::draw(const Parenthesis* item, muse::draw::Painter* painter)
+{
+    TRACE_DRAW_ITEM;
+
+    Segment* seg = item->segment();
+    EngravingItem* segItem = seg ? seg->element(item->track()) : nullptr;
+    TimeSig* segTs = segItem && segItem->isTimeSig() ? toTimeSig(segItem) : nullptr;
+
+    if (segTs && !segTs->showOnThisStaff()) {
+        return;
+    }
+
+    Color penColor = item->curColor(item->getProperty(Pid::VISIBLE).toBool(), item->getProperty(Pid::COLOR).value<Color>());
+
+    Pen pen(penColor);
+    double mag = item->staff() ? item->staff()->staffMag(item->tick()) : 1.0;
+
+    painter->setBrush(Brush(pen.color()));
+    pen.setCapStyle(PenCapStyle::RoundCap);
+    pen.setJoinStyle(PenJoinStyle::RoundJoin);
+    pen.setWidthF(Parenthesis::PARENTHESIS_END_WIDTH * item->spatium() * mag);
+
+    painter->setPen(pen);
+    painter->drawPath(item->ldata()->path());
 }
 
 void TDraw::draw(const PartialTieSegment* item, muse::draw::Painter* painter)
