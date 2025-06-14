@@ -53,14 +53,14 @@ SPDX-License-Identifier: LicenseRef-Qt-Commercial OR GPL-3.0-only
       </center>
     </figure>
 
-    <div id="panel">
+    <div id="screen"></div>
+
+<!--    <div id="panel">
       <button onclick="onclickTest1()">Test 1</button>
       <button>Test 2</button>
       <button>Test 3</button>
       <input id="load_file" type="file" onchange="loadFile(this.files[0])">
-    </div>
-
-    <div id="screen"></div>
+    </div>-->
 
     <script type="text/javascript">
         async function init()
@@ -126,13 +126,41 @@ SPDX-License-Identifier: LicenseRef-Qt-Commercial OR GPL-3.0-only
       }
     </script>  
 
+    // Interactive
+    <script type="text/javascript">
+
+      function openFileDialog(callback) {
+        console.log("[js] openFileDialog")
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            const fileName = file.name
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const contents = e.target.result;
+                const uint8View = new Uint8Array(contents);
+                console.log("[js] openFileDialog fileName: ", fileName, ", contents: ", uint8View.length, ", [0]=", uint8View[0])
+                callback(fileName, uint8View);
+            };
+            reader.readAsArrayBuffer(file); 
+        };
+        input.click();
+      }
+    </script>
+
     <script type="module">
         import createMuApi from "./muapi.js";
 
         function onInit() {
           console.log("on init mu api")
           window.muapi = createMuApi({
-            muwasm: window.muwasm   
+            muwasm: window.muwasm,
+
+            // callbacks
+            onProjectSaved: function(data) {
+              console.log("[html] onProjectSaved len: ", data.length)
+            }   
           })
         }
 
