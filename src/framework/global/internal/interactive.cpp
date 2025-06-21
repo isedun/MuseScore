@@ -47,19 +47,6 @@
 
 using namespace muse;
 
-#ifndef Q_OS_LINUX
-static QString filterToString(const std::vector<std::string>& filter)
-{
-    QStringList result;
-    for (const std::string& nameFilter : filter) {
-        result << QString::fromStdString(nameFilter);
-    }
-
-    return result.join(";;");
-}
-
-#endif
-
 IInteractive::ButtonData Interactive::buttonData(Button b) const
 {
     constexpr bool accent = true;
@@ -256,11 +243,17 @@ void Interactive::showProgress(const std::string& title, Progress* progress)
 }
 
 #ifdef Q_OS_LINUX
-static UriQuery makeSelectFileQuery(int mode, const QString& title, const io::path_t& dir, const std::vector<std::string>& filter,
-                                    bool confirmOverwrite)
+// see QQuickPlatformFileDialog::FileMode
+enum class FileDialogMode {
+    OpenFile = 0,
+    SaveFile = 2
+};
+
+static UriQuery makeSelectFileQuery(FileDialogMode mode, const std::string& title, const io::path_t& current,
+                                    const std::vector<std::string>& filter, bool confirmOverwrite)
 {
     UriQuery q("muse://interactive/selectfile");
-    q.set("title", title.toStdString());
+    q.set("title", title);
 
     ValList filterList;
     for (const std::string& f : filter) {
@@ -268,13 +261,16 @@ static UriQuery makeSelectFileQuery(int mode, const QString& title, const io::pa
     }
 
     q.set("nameFilters", filterList);
-    q.set("selectExisting", true);
-    // see QQuickPlatformFileDialog::FileMode::OpenFile
-    q.set("fileMode", mode);
-    q.set("folder", QUrl::fromLocalFile(dir.toQString()).toLocalFile().toStdString());
+    q.set("fileMode", static_cast<int>(mode));
+    if (mode == FileDialogMode::OpenFile) {
+        q.set("selectExisting", true);
+        q.set("folder", QUrl::fromLocalFile(current.toQString()).toString().toStdString());
+    } else if (mode == FileDialogMode::SaveFile) {
+        q.set("currentFile", QUrl::fromLocalFile(current.toQString()).toString().toStdString());
 
-    if (!confirmOverwrite) {
-        q.set("options", QFileDialog::DontConfirmOverwrite);
+        if (!confirmOverwrite) {
+            q.set("options", QFileDialog::DontConfirmOverwrite);
+        }
     }
 
     return q;
@@ -282,16 +278,74 @@ static UriQuery makeSelectFileQuery(int mode, const QString& title, const io::pa
 
 #endif
 
-io::path_t Interactive::selectOpeningFile(const QString& title, const io::path_t& dir, const std::vector<std::string>& filter)
+#ifndef Q_OS_LINUX
+static QString filterToString(const std::vector<std::string>& filter)
+{
+    QStringList result;
+    for (const std::string& nameFilter : filter) {
+        result << QString::fromStdString(nameFilter);
+    }
+
+    return result.join(";;");
+}
+
+#endif
+
+async::Promise<io::path_t> Interactive::selectOpeningFile(const std::string& title, const io::path_t& dir,
+                                                          const std::vector<std::string>& filter)
 {
 #ifndef Q_OS_LINUX
-    QString result = QFileDialog::getOpenFileName(nullptr, title, dir.toQString(), filterToString(filter));
+    return async::make_promise<io::path_t>([title, dir, filter](auto resolve, auto reject) {
+        QFileDialog* dlg = new QFileDialog(nullptr, QString::fromStdString(title), dir.toQString(), filterToString(filter));
+
+        dlg->setFileMode(QFileDialog::ExistingFile);
+
+        QObject::connect(dlg, &QFileDialog::finished, [dlg, resolve, reject](int result) {
+            dlg->deleteLater();
+
+            QStringList files = dlg->selectedFiles();
+
+            if (result != QDialog::Accepted || files.isEmpty()) {
+                Ret ret = muse::make_ret(Ret::Code::Cancel);
+                (void)reject(ret.code(), ret.text());
+                return;
+            }
+
+            QString file = files.first();
+            (void)resolve(file);
+        });
+
+        dlg->open();
+
+        return async::Promise<io::path_t>::Result::unchecked();
+    }, async::PromiseType::AsyncByBody);
+
+#else
+
+    UriQuery q = makeSelectFileQuery(FileDialogMode::OpenFile, title, dir, filter, false);
+
+    async::Promise<Val> promise = provider()->openAsync(q);
+
+    return async::make_promise<io::path_t>([promise, this](auto resolve, auto reject) {
+        async::Promise<Val> mut = promise;
+        mut.onResolve(this, [resolve](const Val& val) {
+            (void)resolve(QUrl::fromUserInput(val.toQString()).toLocalFile());
+        }).onReject(this, [resolve, reject](int code, const std::string& err) {
+            (void)reject(code, err);
+        });
+        return async::Promise<io::path_t>::Result::unchecked();
+    }, async::PromiseType::AsyncByBody);
+#endif
+}
+
+io::path_t Interactive::selectOpeningFileSync(const std::string& title, const io::path_t& dir, const std::vector<std::string>& filter)
+{
+#ifndef Q_OS_LINUX
+    QString result = QFileDialog::getOpenFileName(nullptr, QString::fromStdString(title), dir.toQString(), filterToString(filter));
     return result;
 #else
 
-    // see QQuickPlatformFileDialog::FileMode::OpenFile
-    int mode = 0;
-    UriQuery q = makeSelectFileQuery(mode, title, dir, filter, false);
+    UriQuery q = makeSelectFileQuery(FileDialogMode::OpenFile, title, dir, filter, false);
 
     RetVal<Val> rv = provider()->openSync(q);
     if (!rv.ret) {
@@ -302,19 +356,18 @@ io::path_t Interactive::selectOpeningFile(const QString& title, const io::path_t
 #endif
 }
 
-io::path_t Interactive::selectSavingFile(const QString& title, const io::path_t& dir, const std::vector<std::string>& filter,
-                                         bool confirmOverwrite)
+io::path_t Interactive::selectSavingFileSync(const std::string& title, const io::path_t& dir, const std::vector<std::string>& filter,
+                                             bool confirmOverwrite)
 {
 #ifndef Q_OS_LINUX
     QFileDialog::Options options;
     options.setFlag(QFileDialog::DontConfirmOverwrite, !confirmOverwrite);
-    QString result = QFileDialog::getSaveFileName(nullptr, title, dir.toQString(), filterToString(filter), nullptr, options);
+    QString result = QFileDialog::getSaveFileName(nullptr, QString::fromStdString(title), dir.toQString(), filterToString(
+                                                      filter), nullptr, options);
     return result;
 #else
 
-    // see QQuickPlatformFileDialog::FileMode::SaveFile
-    int mode = 2;
-    UriQuery q = makeSelectFileQuery(mode, title, dir, filter, confirmOverwrite);
+    UriQuery q = makeSelectFileQuery(FileDialogMode::SaveFile, title, dir, filter, confirmOverwrite);
 
     RetVal<Val> rv = provider()->openSync(q);
     if (!rv.ret) {
@@ -325,15 +378,15 @@ io::path_t Interactive::selectSavingFile(const QString& title, const io::path_t&
 #endif
 }
 
-io::path_t Interactive::selectDirectory(const QString& title, const io::path_t& dir)
+io::path_t Interactive::selectDirectory(const std::string& title, const io::path_t& dir)
 {
 #ifndef Q_OS_LINUX
-    QString result = QFileDialog::getExistingDirectory(nullptr, title, dir.toQString());
+    QString result = QFileDialog::getExistingDirectory(nullptr, QString::fromStdString(title), dir.toQString());
     return result;
 #else
 
     UriQuery q("muse://interactive/selectdir");
-    q.set("title", title.toStdString());
+    q.set("title", title);
     q.set("folder", QUrl::fromLocalFile(dir.toQString()).toLocalFile().toStdString());
 
     RetVal<Val> rv = provider()->openSync(q);
@@ -345,12 +398,11 @@ io::path_t Interactive::selectDirectory(const QString& title, const io::path_t& 
 #endif
 }
 
-io::paths_t Interactive::selectMultipleDirectories(const QString& title, const io::path_t& dir, const io::paths_t& selectedDirectories)
+io::paths_t Interactive::selectMultipleDirectories(const std::string& title, const io::path_t& dir, const io::paths_t& selectedDirectories)
 {
-    QString directoriesStr = QString::fromStdString(io::pathsToString(selectedDirectories));
     UriQuery q("muse://interactive/selectmultipledirectories");
-    q.set("title", title.toStdString())
-    .set("selectedDirectories", directoriesStr.toStdString())
+    q.set("title", title)
+    .set("selectedDirectories", io::pathsToString(selectedDirectories))
     .set("startDir", dir.toStdString());
 
     RetVal<Val> result = openSync(q);
@@ -358,15 +410,12 @@ io::paths_t Interactive::selectMultipleDirectories(const QString& title, const i
         return selectedDirectories;
     }
 
-    return io::pathsFromString(result.val.toQString().toStdString());
+    return io::pathsFromString(result.val.toString());
 }
 
-QColor Interactive::selectColor(const QColor& color, const QString& title)
+async::Promise<Color> Interactive::selectColor(const Color& color, const std::string& title)
 {
-    shortcutsRegister()->setActive(false);
-    QColor selectColor = provider()->selectColor(color, title).val;
-    shortcutsRegister()->setActive(true);
-    return selectColor;
+    return provider()->selectColor(color, title);
 }
 
 bool Interactive::isSelectColorOpened() const

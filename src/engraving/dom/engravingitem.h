@@ -435,6 +435,9 @@ public:
     virtual void setAutoplace(bool v) { setFlag(ElementFlag::NO_AUTOPLACE, !v); }
     bool addToSkyline() const { return !(m_flags & (ElementFlag::INVISIBLE | ElementFlag::NO_AUTOPLACE)) && !ldata()->isSkipDraw(); }
 
+    bool excludeVerticalAlign() const { return m_excludeVerticalAlign; }
+    void setExcludeVerticalAlign(bool v) { m_excludeVerticalAlign = v; }
+
     PropertyValue getProperty(Pid) const override;
     bool setProperty(Pid, const PropertyValue&) override;
     void undoChangeProperty(Pid id, const PropertyValue&, PropertyFlags ps) override;
@@ -737,6 +740,8 @@ private:
     mutable ElementFlags m_flags;
 
     bool m_colorsInversionEnabled = true;
+
+    bool m_excludeVerticalAlign = false;
 
     mutable LayoutData* m_layoutData = nullptr;
 };

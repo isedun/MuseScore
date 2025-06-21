@@ -581,18 +581,38 @@ class TransposeHarmony : public UndoCommand
 {
     OBJECT_ALLOCATOR(engraving, TransposeHarmony)
 
-    Harmony* harmony = nullptr;
-    int rootTpc = 0;
-    int baseTpc = 0;
+    Harmony* m_harmony = nullptr;
+
+    Interval m_interval = Interval(0, 0);
+    bool m_useDoubleSharpsFlats = false;
 
     void flip(EditData*) override;
 
 public:
-    TransposeHarmony(Harmony*, int rootTpc, int baseTpc);
+    TransposeHarmony(Harmony*, Interval interval, bool useDoubleSharpsFlats);
 
     UNDO_TYPE(CommandType::TransposeHarmony)
     UNDO_NAME("TransposeHarmony")
-    UNDO_CHANGED_OBJECTS({ harmony })
+    UNDO_CHANGED_OBJECTS({ m_harmony })
+};
+
+class TransposeHarmonyDiatonic : public UndoCommand
+{
+    OBJECT_ALLOCATOR(engraving, TransposeHarmonyDiatonic)
+
+    Harmony* m_harmony = nullptr;
+    int m_interval = 0;
+    bool m_useDoubleSharpsFlats = false;
+    bool m_transposeKeys = false;
+
+    void flip(EditData*) override;
+
+public:
+    TransposeHarmonyDiatonic(Harmony*, int interval, bool useDoubleSharpsFlats, bool transposeKeys);
+
+    UNDO_TYPE(CommandType::TransposeHarmony)
+    UNDO_NAME("TransposeHarmonyDiatonic")
+    UNDO_CHANGED_OBJECTS({ m_harmony })
 };
 
 class ExchangeVoice : public UndoCommand
@@ -1689,7 +1709,7 @@ class RenameChordFBox : public UndoCommand
     String m_harmonyOldName;
     bool m_onlyRemove = false;
 
-    std::vector<std::pair<int, FretDiagram*> > m_diagramsForRestore;
+    std::vector<std::pair<size_t, FretDiagram*> > m_diagramsForRestore;
     FretDiagram* m_diagramForRemove = nullptr;
 
     void undo(EditData*) override;
@@ -1712,7 +1732,7 @@ class AddChordFBox : public UndoCommand
     Fraction m_tick;
     String m_chordNewName;
 
-    std::vector<std::pair<int, FretDiagram*> > m_diagramsForRestore;
+    std::vector<std::pair<size_t, FretDiagram*> > m_diagramsForRestore;
 
     void undo(EditData*) override;
     void redo(EditData*) override;
@@ -1735,7 +1755,7 @@ class RemoveChordFBox : public UndoCommand
     String m_chordName;
 
     FretDiagram* m_removedFretDiagram = nullptr;
-    int m_removedFretDiagramIndex = 0;
+    size_t m_removedFretDiagramIndex = 0;
 
     FretDiagram* m_addedFretDiagram = nullptr;
 

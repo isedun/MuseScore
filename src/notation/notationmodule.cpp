@@ -51,6 +51,7 @@
 #include "view/notationnavigator.h"
 
 #include "view/selectionfilter/voicesselectionfiltermodel.h"
+#include "view/selectionfilter/notesinchordselectionfiltermodel.h"
 #include "view/selectionfilter/elementsselectionfiltermodel.h"
 
 #include "view/editgridsizedialogmodel.h"
@@ -99,6 +100,9 @@
 #include "view/styledialog/notelinesectionmodel.h"
 #include "view/styledialog/clefkeytimesigpagemodel.h"
 #include "view/styledialog/hammeronpullofftappingpagemodel.h"
+#include "view/styledialog/repeatbarlinessectionmodel.h"
+#include "view/styledialog/chordsymbolspagemodel.h"
+#include "view/styledialog/voltaspagemodel.h"
 
 #include "diagnostics/idiagnosticspathsregister.h"
 
@@ -198,6 +202,7 @@ void NotationModule::registerUiTypes()
     qmlRegisterType<TimelineView>("MuseScore.NotationScene", 1, 0, "TimelineView");
     qmlRegisterType<ElementsSelectionFilterModel>("MuseScore.NotationScene", 1, 0, "ElementsSelectionFilterModel");
     qmlRegisterType<VoicesSelectionFilterModel>("MuseScore.NotationScene", 1, 0, "VoicesSelectionFilterModel");
+    qmlRegisterType<NotesInChordSelectionFilterModel>("MuseScore.NotationScene", 1, 0, "NotesInChordSelectionFilterModel");
     qmlRegisterType<EditGridSizeDialogModel>("MuseScore.NotationScene", 1, 0, "EditGridSizeDialogModel");
     qmlRegisterType<EditPercussionShortcutModel>("MuseScore.NotationScene", 1, 0, "EditPercussionShortcutModel");
     qmlRegisterType<PianoKeyboardView>("MuseScore.NotationScene", 1, 0, "PianoKeyboardView");
@@ -232,6 +237,9 @@ void NotationModule::registerUiTypes()
     qmlRegisterType<NoteLineSectionModel>("MuseScore.NotationScene", 1, 0, "NoteLineSectionModel");
     qmlRegisterType<ClefKeyTimeSigPageModel>("MuseScore.NotationScene", 1, 0, "ClefKeyTimeSigPageModel");
     qmlRegisterType<HammerOnPullOffTappingPageModel>("MuseScore.NotationScene", 1, 0, "HammerOnPullOffTappingPageModel");
+    qmlRegisterType<RepeatBarlinesSectionModel>("MuseScore.NotationScene", 1, 0, "RepeatBarlinesSectionModel");
+    qmlRegisterType<ChordSymbolsPageModel>("MuseScore.NotationScene", 1, 0, "ChordSymbolsPageModel");
+    qmlRegisterType<VoltasPageModel>("MuseScore.NotationScene", 1, 0, "VoltasPageModel");
 
     qmlRegisterUncreatableType<NoteInputBarCustomiseItem>("MuseScore.NotationScene", 1, 0, "NoteInputBarCustomiseItem", "Cannot create");
 

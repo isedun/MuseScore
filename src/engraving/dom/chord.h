@@ -48,7 +48,6 @@ class Note;
 class NoteEventList;
 class Stem;
 class StemSlash;
-class StretchedBend;
 class TremoloTwoChord;
 class TremoloSingleChord;
 
@@ -191,9 +190,6 @@ public:
     int line() const { return ldata()->up ? upLine() : downLine(); }
     int upLine() const;
     int downLine() const;
-    PointF stemPos() const override;            ///< page coordinates
-    PointF stemPosBeam() const override;        ///< page coordinates
-    double stemPosX() const override;
     double rightEdge() const override;
 
     bool underBeam() const;
@@ -251,6 +247,7 @@ public:
     const std::vector<Articulation*>& articulations() const { return m_articulations; }
     std::set<SymId> articulationSymbolIds() const;
     Articulation* hasArticulation(const Articulation*);
+    Tapping* tapping() const;
     bool hasSingleArticulation() const { return m_articulations.size() == 1; }
 
     void updateArticulations(const std::set<SymId>& newArticulationIds,
@@ -313,7 +310,6 @@ public:
 
     double upPos()   const override;
     double downPos() const override;
-    double centerX() const;
 
     struct StartEndSlurs {
         bool startUp = false;

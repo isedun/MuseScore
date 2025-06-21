@@ -39,6 +39,7 @@
 #include "spanner.h"
 #include "staff.h"
 #include "soundflag.h"
+#include "tapping.h"
 
 using namespace mu;
 
@@ -602,7 +603,7 @@ ChordRest* Score::prevTrack(ChordRest* cr, bool skipMeasureRepeatRests)
 ChordRest* Score::nextMeasure(ChordRest* element, bool selectBehavior, bool mmRest)
 {
     if (!element) {
-        return 0;
+        return nullptr;
     }
 
     Measure* measure = nullptr;
@@ -612,12 +613,8 @@ ChordRest* Score::nextMeasure(ChordRest* element, bool selectBehavior, bool mmRe
         measure = element->measure()->nextMeasure();
     }
 
-    if (!measure) {
-        return 0;
-    }
-
     Fraction endTick = element->measure()->last()->nextChordRest(element->track(), true)->tick();
-    bool last   = false;
+    bool last = false;
 
     if (selection().isRange()) {
         if (element->tick() != endTick && selection().tickEnd() <= endTick) {
@@ -647,7 +644,7 @@ ChordRest* Score::nextMeasure(ChordRest* element, bool selectBehavior, bool mmRe
             }
         }
     }
-    return 0;
+    return nullptr;
 }
 
 //---------------------------------------------------------
@@ -657,10 +654,10 @@ ChordRest* Score::nextMeasure(ChordRest* element, bool selectBehavior, bool mmRe
 ChordRest* Score::prevMeasure(ChordRest* element, bool mmRest)
 {
     if (!element) {
-        return 0;
+        return nullptr;
     }
 
-    Measure* measure =  0;
+    Measure* measure = nullptr;
     if (mmRest) {
         measure = element->measure()->prevMeasureMM();
     } else {
@@ -693,7 +690,7 @@ ChordRest* Score::prevMeasure(ChordRest* element, bool mmRest)
             }
         }
     }
-    return 0;
+    return nullptr;
 }
 
 //---------------------------------------------------------
@@ -753,6 +750,15 @@ EngravingItem* Score::nextElement()
                 return score()->firstElement();
             }
         }
+        case ElementType::TAPPING:
+        {
+            TappingHalfSlur* halfSlurAbove = toTapping(e)->halfSlurAbove();
+            EngravingItem* selEl = getSelectedElement();
+            if (halfSlurAbove && !(selEl && selEl->isTappingHalfSlurSegment())) {
+                return halfSlurAbove->frontSegment();
+            }
+            break;
+        }
         case ElementType::HAMMER_ON_PULL_OFF_TEXT:
             return toHammerOnPullOffText(e)->endChord()->upNote();
         case ElementType::HAMMER_ON_PULL_OFF_SEGMENT:
@@ -760,6 +766,14 @@ EngravingItem* Score::nextElement()
             HammerOnPullOffSegment* hopoSeg = toHammerOnPullOffSegment(e);
             if (!hopoSeg->hopoText().empty()) {
                 return hopoSeg->hopoText().front();
+            } // else fallthrough:
+        }
+        case ElementType::TAPPING_HALF_SLUR_SEGMENT:
+        {
+            TappingHalfSlur* halfSlur = toTappingHalfSlurSegment(e)->tappingHalfSlur();
+            Tapping* tapping = halfSlur->tapping();
+            if (halfSlur->isHalfSlurAbove() && tapping->halfSlurBelow()) {
+                return tapping->halfSlurBelow()->frontSegment();
             } // else fallthrough:
         }
         case ElementType::VOLTA_SEGMENT:
@@ -907,9 +921,9 @@ EngravingItem* Score::nextElement()
                 size_t index = muse::indexOf(diagrams, fretDiagram);
                 if (index != muse::nidx) {
                     while (++index < diagrams.size()) {
-                        FretDiagram* fretDiagram = toFretDiagram(diagrams[index]);
-                        if (fretDiagram->visible()) {
-                            return fretDiagram->harmony();
+                        FretDiagram* fretDiagramI = toFretDiagram(diagrams[index]);
+                        if (fretDiagramI->visible()) {
+                            return fretDiagramI->harmony();
                         }
                     }
                 }
@@ -994,6 +1008,19 @@ EngravingItem* Score::prevElement()
                 return hopoSegment;
             } else {
                 return hopoText->startChord()->downNote();
+            }
+        }
+        case ElementType::TAPPING_HALF_SLUR_SEGMENT:
+        {
+            TappingHalfSlur* halfSlur = toTappingHalfSlurSegment(e)->tappingHalfSlur();
+            Tapping* tapping = halfSlur->tapping();
+            if (!halfSlur->isHalfSlurAbove()) {
+                IF_ASSERT_FAILED(tapping->halfSlurAbove()) {
+                    return tapping;
+                }
+                return tapping->halfSlurAbove()->frontSegment();
+            } else {
+                return tapping;
             }
         }
         case ElementType::VOLTA_SEGMENT:
@@ -1132,9 +1159,9 @@ EngravingItem* Score::prevElement()
                 size_t index = muse::indexOf(diagrams, fretDiagram);
                 if (index != muse::nidx) {
                     while (--index > 0) {
-                        FretDiagram* fretDiagram = toFretDiagram(diagrams[index]);
-                        if (fretDiagram->visible()) {
-                            return fretDiagram;
+                        FretDiagram* fretDiagramI = toFretDiagram(diagrams[index]);
+                        if (fretDiagramI->visible()) {
+                            return fretDiagramI;
                         }
                     }
                 }

@@ -376,9 +376,6 @@ static const std::array ELEMENT_TYPES {
     Item{ ElementType::BEND, "Bend",
           TranslatableString("engraving", "bend(s)", nullptr, 1),
           TranslatableString("engraving", "Bend(s)", nullptr, 1) },
-    Item{ ElementType::STRETCHED_BEND, "Bend",
-          TranslatableString("engraving", "bend(s)", nullptr, 1),
-          TranslatableString("engraving", "Bend(s)", nullptr, 1) },
     Item{ ElementType::TREMOLOBAR, "TremoloBar",
           TranslatableString("engraving", "tremolo bar(s)", nullptr, 1),
           TranslatableString("engraving", "Tremolo bar(s)", nullptr, 1) },
@@ -613,6 +610,20 @@ static const std::array ELEMENT_TYPES {
     Item{ ElementType::HAMMER_ON_PULL_OFF_TEXT, "HammerOnPullOffText",
           TranslatableString("engraving", "hammer-on / pull-off text(s)", nullptr, 1),
           TranslatableString("engraving", "Hammer-on / pull-off text(s)", nullptr, 1) },
+    Item{ ElementType::TAPPING, "Tapping",
+          TranslatableString("engraving", "tapping", nullptr, 1),
+          TranslatableString("engraving", "Tapping", nullptr, 1) },
+    Item{ ElementType::TAPPING_HALF_SLUR, "TappingHalfSlur",
+          TranslatableString("engraving", "tapping half slur", nullptr, 1),
+          TranslatableString("engraving", "Tapping half slur", nullptr, 1),
+    },
+    Item{ ElementType::TAPPING_HALF_SLUR_SEGMENT, "TappingHalfSlurSegment",
+          TranslatableString("engraving", "tapping half slur segment"),
+          TranslatableString("engraving", "Tapping half slur segment") },
+    Item{ ElementType::TAPPING_TEXT, "TappingText",
+          TranslatableString("engraving", "tapping text"),
+          TranslatableString("engraving", "Tapping text"),
+    },
     Item{ ElementType::ROOT_ITEM, "RootItem",
           TranslatableString::untranslatable("root item"),
           TranslatableString::untranslatable("Root item") },
@@ -666,11 +677,21 @@ AlignV TConv::fromXml(const AsciiStringView& tag, AlignV def)
     return findTypeByXmlTag<AlignV>(ALIGN_V, tag, def);
 }
 
+String TConv::toXml(AlignH v)
+{
+    return String::fromAscii(findXmlTagByType<AlignH>(ALIGN_H, v).ascii());
+}
+
+String TConv::toXml(AlignV v)
+{
+    return String::fromAscii(findXmlTagByType<AlignV>(ALIGN_V, v).ascii());
+}
+
 String TConv::toXml(Align v)
 {
     StringList sl;
-    sl << String::fromAscii(findXmlTagByType<AlignH>(ALIGN_H, v.horizontal).ascii());
-    sl << String::fromAscii(findXmlTagByType<AlignV>(ALIGN_V, v.vertical).ascii());
+    sl << toXml(v.horizontal);
+    sl << toXml(v.vertical);
     return sl.join(u",");
 }
 
@@ -816,6 +837,90 @@ AsciiStringView TConv::toXml(TimeSigVSMargin timeSigVSMargin)
 TimeSigVSMargin TConv::fromXml(const AsciiStringView& str, TimeSigVSMargin def)
 {
     return findTypeByXmlTag<TimeSigVSMargin>(TIMESIG_MARGIN, str, def);
+}
+
+static const std::vector<Item<NoteSpellingType> > NOTE_SPELLING_TYPE = {
+    { NoteSpellingType::STANDARD, "standard" },
+    { NoteSpellingType::GERMAN, "german" },
+    { NoteSpellingType::GERMAN_PURE, "germanPure" },
+    { NoteSpellingType::SOLFEGGIO, "solfeggio" },
+    { NoteSpellingType::FRENCH, "french" },
+};
+
+AsciiStringView TConv::toXml(NoteSpellingType noteSpellingType)
+{
+    return findXmlTagByType<NoteSpellingType>(NOTE_SPELLING_TYPE, noteSpellingType);
+}
+
+NoteSpellingType TConv::fromXml(const AsciiStringView& str, NoteSpellingType def)
+{
+    return findTypeByXmlTag<NoteSpellingType>(NOTE_SPELLING_TYPE, str, def);
+}
+
+static const std::vector<Item<ChordStylePreset> > CHORD_STYLE_PRESET = {
+    { ChordStylePreset::STANDARD, "std" },
+    { ChordStylePreset::JAZZ, "jazz" },
+    { ChordStylePreset::LEGACY, "legacy" },
+    { ChordStylePreset::CUSTOM, "custom" },
+};
+
+AsciiStringView TConv::toXml(ChordStylePreset chordStylePreset)
+{
+    return findXmlTagByType<ChordStylePreset>(CHORD_STYLE_PRESET, chordStylePreset);
+}
+
+ChordStylePreset TConv::fromXml(const AsciiStringView& str, ChordStylePreset def)
+{
+    return findTypeByXmlTag<ChordStylePreset>(CHORD_STYLE_PRESET, str, def);
+}
+
+std::vector<Item<TappingHand> > TAPPING_HAND
+{
+    { TappingHand::INVALID, "invalid" },
+    { TappingHand::LEFT, "left" },
+    { TappingHand::RIGHT, "right" },
+};
+
+AsciiStringView TConv::toXml(TappingHand tappingHand)
+{
+    return findXmlTagByType<TappingHand>(TAPPING_HAND, tappingHand);
+}
+
+TappingHand TConv::fromXml(const AsciiStringView& str, TappingHand def)
+{
+    return findTypeByXmlTag<TappingHand>(TAPPING_HAND, str, def);
+}
+
+std::vector<Item<LHTappingSymbol> > LH_TAPPING_SYMBOL
+{
+    { LHTappingSymbol::DOT, "dot" },
+    { LHTappingSymbol::CIRCLED_T, "circledT" },
+};
+
+AsciiStringView TConv::toXml(LHTappingSymbol lh)
+{
+    return findXmlTagByType<LHTappingSymbol>(LH_TAPPING_SYMBOL, lh);
+}
+
+LHTappingSymbol TConv::fromXml(const AsciiStringView& str, LHTappingSymbol def)
+{
+    return findTypeByXmlTag<LHTappingSymbol>(LH_TAPPING_SYMBOL, str, def);
+}
+
+std::vector<Item<RHTappingSymbol> > RH_TAPPING_SYMBOL
+{
+    { RHTappingSymbol::T, "T" },
+    { RHTappingSymbol::PLUS, "plus" },
+};
+
+AsciiStringView TConv::toXml(RHTappingSymbol rh)
+{
+    return findXmlTagByType<RHTappingSymbol>(RH_TAPPING_SYMBOL, rh);
+}
+
+RHTappingSymbol TConv::fromXml(const AsciiStringView& str, RHTappingSymbol def)
+{
+    return findTypeByXmlTag<RHTappingSymbol>(RH_TAPPING_SYMBOL, str, def);
 }
 
 static const std::vector<Item<VoiceAssignment> > VOICE_ASSIGNMENT = {
@@ -1398,13 +1503,6 @@ DynamicType TConv::fromXml(const AsciiStringView& tag, DynamicType def)
     return it->type;
 }
 
-DynamicRange TConv::fromXml(const AsciiStringView& tag, DynamicRange def)
-{
-    bool ok = false;
-    int v = tag.toInt(&ok);
-    return ok ? DynamicRange(v) : def;
-}
-
 static const std::vector<Item<DynamicSpeed> > DYNAMIC_SPEEDS = {
     { DynamicSpeed::NORMAL, "normal" },
     { DynamicSpeed::SLOW,   "slow" },
@@ -1556,6 +1654,7 @@ static const std::vector<Item<TextStyleType> > TEXTSTYLE_TYPES = {
     { TextStyleType::TUPLET,            "tuplet",               muse::TranslatableString("engraving", "Tuplet") },
     { TextStyleType::STICKING,          "sticking",             muse::TranslatableString("engraving", "Sticking") },
     { TextStyleType::FINGERING,         "fingering",            muse::TranslatableString("engraving", "Fingering") },
+    { TextStyleType::TAB_FRET_NUMBER,   "tab_fret_number",      muse::TranslatableString("engraving", "Tablature fret number") },
     { TextStyleType::LH_GUITAR_FINGERING, "guitar_fingering_lh", muse::TranslatableString("engraving", "LH guitar fingering") },
     { TextStyleType::RH_GUITAR_FINGERING, "guitar_fingering_rh", muse::TranslatableString("engraving", "RH guitar fingering") },
     { TextStyleType::HAMMER_ON_PULL_OFF, "hammer_on_pull_off",

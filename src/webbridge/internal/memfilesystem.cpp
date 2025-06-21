@@ -195,21 +195,18 @@ muse::Ret MemFileSystem::writeFile(const muse::io::path_t& path, const muse::Byt
     return muse::make_ok();
 }
 
-muse::io::path_t MemFileSystem::canonicalFilePath(const muse::io::path_t& /*path*/) const
+muse::io::path_t MemFileSystem::canonicalFilePath(const muse::io::path_t& path) const
 {
-    NOT_IMPLEMENTED;
-    return muse::io::path_t();
+    return path;
 }
 
-muse::io::path_t MemFileSystem::absolutePath(const muse::io::path_t& /*path*/) const
+muse::io::path_t MemFileSystem::absolutePath(const muse::io::path_t& path) const
 {
-    NOT_IMPLEMENTED;
-    return muse::io::path_t();
+    return path;
 }
 
 muse::io::path_t MemFileSystem::absoluteFilePath(const muse::io::path_t& path) const
 {
-    NOT_IMPLEMENTED;
     return path;
 }
 
@@ -227,6 +224,5 @@ muse::DateTime MemFileSystem::lastModified(const muse::io::path_t& /*path*/) con
 
 muse::Ret MemFileSystem::isWritable(const muse::io::path_t& /*path*/) const
 {
-    NOT_IMPLEMENTED;
-    return muse::Ret();
+    return muse::make_ok();
 }

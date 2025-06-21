@@ -26,6 +26,7 @@
 
 #include "engravingitem.h"
 #include "durationtype.h"
+#include "tapping.h"
 #include "types.h"
 
 namespace mu::engraving {
@@ -57,6 +58,9 @@ public:
     static Articulation* createArticulation(ChordRest* parent, bool isAccessibleEnabled = true);
     static std::shared_ptr<Articulation> makeArticulation(ChordRest* parent);
 
+    static Tapping* createTapping(ChordRest* parent, bool isAccessibleEnabled = true);
+    static std::shared_ptr<Tapping> makeTapping(ChordRest* parent);
+
     static Ornament* createOrnament(ChordRest* parent, bool isAccessibleEnabled = true);
     static std::shared_ptr<Ornament> makeOrnament(ChordRest* parent);
 
@@ -69,9 +73,6 @@ public:
 
     static Bend* createBend(Note* parent, bool isAccessibleEnabled = true);
     static std::shared_ptr<Bend> makeBend(Note* parent);
-
-    static StretchedBend* createStretchedBend(Chord* parent, bool isAccessibleEnabled = true);
-    static StretchedBend* copyStretchedBend(const StretchedBend& src);
 
     static Bracket* createBracket(EngravingItem* parent, bool isAccessibleEnabled = true);
     static std::shared_ptr<Bracket> makeBracket(EngravingItem* parent);
