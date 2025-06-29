@@ -38,6 +38,7 @@
 #include "chord.h"
 #include "drumset.h"
 #include "fret.h"
+#include "harmony.h"
 #include "harppedaldiagram.h"
 #include "input.h"
 #include "instrchange.h"
@@ -90,6 +91,125 @@ class Text;
 class TremoloBar;
 
 enum class PlayEventType : unsigned char;
+
+enum class CommandType : signed char {
+    Unknown = -1,
+
+    // Parts
+    InsertPart,
+    RemovePart,
+    AddPartToExcerpt,
+    SetSoloist,
+    ChangePart,
+
+    // Staves
+    InsertStaff,
+    RemoveStaff,
+    AddSystemObjectStaff,
+    RemoveSystemObjectStaff,
+    SortStaves,
+    ChangeStaff,
+    ChangeStaffType,
+
+    // MStaves
+    InsertMStaff,
+    RemoveMStaff,
+    InsertStaves,
+    RemoveStaves,
+    ChangeMStaffProperties,
+
+    // Instruments
+    ChangeInstrumentShort,
+    ChangeInstrumentLong,
+    ChangeInstrument,
+    ChangeDrumset,
+
+    // Measures
+    RemoveMeasures,
+    InsertMeasures,
+    ChangeMeasureLen,
+    ChangeMMRest,
+    ChangeMeasureRepeatCount,
+
+    // Elements
+    AddElement,
+    RemoveElement,
+    Unlink,
+    Link,
+    ChangeElement,
+    ChangeParent,
+
+    // Notes
+    ChangePitch,
+    ChangeFretting,
+    ChangeVelocity,
+
+    // ChordRest
+    ChangeChordStaffMove,
+    SwapCR,
+
+    // Brackets
+    RemoveBracket,
+    AddBracket,
+
+    // Fret
+    FretDataChange,
+    FretDot,
+    FretMarker,
+    FretBarre,
+    FretClear,
+    FretLinkHarmony,
+
+    // FBox
+    ReorderFBox,
+    RenameChordFBox,
+    AddChordFBox,
+    RemoveChordFBox,
+
+    // Harmony
+    TransposeHarmony,
+
+    // KeySig
+    ChangeKeySig,
+
+    // Clef
+    ChangeClefType,
+
+    // Tremolo
+    MoveTremolo,
+
+    // Spanners
+    ChangeSpannerElements,
+    InsertTimeUnmanagedSpanner,
+    ChangeStartEndSpanner,
+
+    // Ties
+    ChangeTieEndPointActive,
+
+    // Style
+    ChangeStyle,
+    ChangeStyleValues,
+
+    // Property
+    ChangeProperty,
+
+    // Voices
+    ExchangeVoice,
+    CloneVoice,
+
+    // Excerpts
+    AddExcerpt,
+    RemoveExcerpt,
+    SwapExcerpt,
+    ChangeExcerptTitle,
+
+    // Meta info
+    ChangeMetaInfo,
+
+    // Other
+    InsertTime,
+    ChangeScoreOrder,
+};
 
 #define UNDO_TYPE(t) CommandType type() const override { return t; }
 #define UNDO_NAME(a) const char* name() const override { return a; }
@@ -581,18 +701,38 @@ class TransposeHarmony : public UndoCommand
 {
     OBJECT_ALLOCATOR(engraving, TransposeHarmony)
 
-    Harmony* harmony = nullptr;
-    int rootTpc = 0;
-    int baseTpc = 0;
+    Harmony* m_harmony = nullptr;
+
+    Interval m_interval = Interval(0, 0);
+    bool m_useDoubleSharpsFlats = false;
 
     void flip(EditData*) override;
 
 public:
-    TransposeHarmony(Harmony*, int rootTpc, int baseTpc);
+    TransposeHarmony(Harmony*, Interval interval, bool useDoubleSharpsFlats);
 
     UNDO_TYPE(CommandType::TransposeHarmony)
     UNDO_NAME("TransposeHarmony")
-    UNDO_CHANGED_OBJECTS({ harmony })
+    UNDO_CHANGED_OBJECTS({ m_harmony })
+};
+
+class TransposeHarmonyDiatonic : public UndoCommand
+{
+    OBJECT_ALLOCATOR(engraving, TransposeHarmonyDiatonic)
+
+    Harmony* m_harmony = nullptr;
+    int m_interval = 0;
+    bool m_useDoubleSharpsFlats = false;
+    bool m_transposeKeys = false;
+
+    void flip(EditData*) override;
+
+public:
+    TransposeHarmonyDiatonic(Harmony*, int interval, bool useDoubleSharpsFlats, bool transposeKeys);
+
+    UNDO_TYPE(CommandType::TransposeHarmony)
+    UNDO_NAME("TransposeHarmonyDiatonic")
+    UNDO_CHANGED_OBJECTS({ m_harmony })
 };
 
 class ExchangeVoice : public UndoCommand
@@ -1689,7 +1829,7 @@ class RenameChordFBox : public UndoCommand
     String m_harmonyOldName;
     bool m_onlyRemove = false;
 
-    std::vector<std::pair<int, FretDiagram*> > m_diagramsForRestore;
+    std::vector<std::pair<size_t, FretDiagram*> > m_diagramsForRestore;
     FretDiagram* m_diagramForRemove = nullptr;
 
     void undo(EditData*) override;
@@ -1712,7 +1852,7 @@ class AddChordFBox : public UndoCommand
     Fraction m_tick;
     String m_chordNewName;
 
-    std::vector<std::pair<int, FretDiagram*> > m_diagramsForRestore;
+    std::vector<std::pair<size_t, FretDiagram*> > m_diagramsForRestore;
 
     void undo(EditData*) override;
     void redo(EditData*) override;
@@ -1735,7 +1875,7 @@ class RemoveChordFBox : public UndoCommand
     String m_chordName;
 
     FretDiagram* m_removedFretDiagram = nullptr;
-    int m_removedFretDiagramIndex = 0;
+    size_t m_removedFretDiagramIndex = 0;
 
     FretDiagram* m_addedFretDiagram = nullptr;
 

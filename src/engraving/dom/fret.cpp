@@ -178,18 +178,8 @@ void FretDiagram::updateDiagram(const String& harmonyName)
 
     String _harmonyName = harmonyName;
 
-    if (!style().styleB(Sid::useStandardNoteNames)) {
-        NoteSpellingType spellingType = NoteSpellingType::STANDARD;
-        if (style().styleB(Sid::useGermanNoteNames)) {
-            spellingType = NoteSpellingType::GERMAN;
-        } else if (style().styleB(Sid::useFullGermanNoteNames)) {
-            spellingType = NoteSpellingType::GERMAN_PURE;
-        } else if (style().styleB(Sid::useSolfeggioNoteNames)) {
-            spellingType = NoteSpellingType::SOLFEGGIO;
-        } else if (style().styleB(Sid::useFrenchNoteNames)) {
-            spellingType = NoteSpellingType::FRENCH;
-        }
-
+    NoteSpellingType spellingType = style().styleV(Sid::chordSymbolSpelling).value<NoteSpellingType>();
+    if (spellingType != NoteSpellingType::STANDARD) {
         NoteCaseType noteCase;
         size_t idx;
         int tpc = convertNote(harmonyName, spellingType, noteCase, idx);
@@ -763,6 +753,11 @@ Font FretDiagram::fingeringFont() const
     return f;
 }
 
+String FretDiagram::harmonyText() const
+{
+    return m_harmony ? m_harmony->plainText() : String();
+}
+
 //---------------------------------------------------------
 //   setHarmony
 ///   if this is being done by the user, use undoSetHarmony instead
@@ -957,6 +952,16 @@ bool FretDiagram::setProperty(Pid propertyId, const PropertyValue& v)
     case Pid::FRET_FINGERING:
         setFingering(v.value<std::vector<int> >());
         break;
+    case Pid::EXCLUDE_VERTICAL_ALIGN:
+    {
+        bool val = v.toBool();
+        setExcludeVerticalAlign(val);
+        Harmony* h = harmony();
+        if (h && h->excludeVerticalAlign() != val) {
+            h->setExcludeVerticalAlign(val);
+        }
+        break;
+    }
     default:
         return EngravingItem::setProperty(propertyId, v);
     }

@@ -109,8 +109,6 @@ set(DOM_SRC
     ${CMAKE_CURRENT_LIST_DIR}/factory.h
     ${CMAKE_CURRENT_LIST_DIR}/fermata.cpp
     ${CMAKE_CURRENT_LIST_DIR}/fermata.h
-    ${CMAKE_CURRENT_LIST_DIR}/fretcircle.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/fretcircle.h
     ${CMAKE_CURRENT_LIST_DIR}/figuredbass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/figuredbass.h
     ${CMAKE_CURRENT_LIST_DIR}/fingering.cpp
@@ -314,8 +312,6 @@ set(DOM_SRC
     ${CMAKE_CURRENT_LIST_DIR}/stemslash.h
     ${CMAKE_CURRENT_LIST_DIR}/sticking.cpp
     ${CMAKE_CURRENT_LIST_DIR}/sticking.h
-    ${CMAKE_CURRENT_LIST_DIR}/stretchedbend.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/stretchedbend.h
     ${CMAKE_CURRENT_LIST_DIR}/stringdata.cpp
     ${CMAKE_CURRENT_LIST_DIR}/stringdata.h
     ${CMAKE_CURRENT_LIST_DIR}/stringtunings.cpp
@@ -334,6 +330,8 @@ set(DOM_SRC
     ${CMAKE_CURRENT_LIST_DIR}/systemdivider.h
     ${CMAKE_CURRENT_LIST_DIR}/systemtext.cpp
     ${CMAKE_CURRENT_LIST_DIR}/systemtext.h
+    ${CMAKE_CURRENT_LIST_DIR}/tapping.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/tapping.h
     ${CMAKE_CURRENT_LIST_DIR}/tempo.cpp
     ${CMAKE_CURRENT_LIST_DIR}/tempo.h
     ${CMAKE_CURRENT_LIST_DIR}/tempotext.cpp
@@ -369,7 +367,6 @@ set(DOM_SRC
     ${CMAKE_CURRENT_LIST_DIR}/tuplet.cpp
     ${CMAKE_CURRENT_LIST_DIR}/tuplet.h
     ${CMAKE_CURRENT_LIST_DIR}/tupletmap.h
-    ${CMAKE_CURRENT_LIST_DIR}/types.h
     ${CMAKE_CURRENT_LIST_DIR}/undo.cpp
     ${CMAKE_CURRENT_LIST_DIR}/undo.h
     ${CMAKE_CURRENT_LIST_DIR}/unrollrepeats.cpp

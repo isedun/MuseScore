@@ -22,6 +22,7 @@
 #include "abstractnotationpaintview.h"
 
 #include <QPainter>
+#include <QMimeData>
 
 #include "actions/actiontypes.h"
 
@@ -1225,6 +1226,10 @@ void AbstractNotationPaintView::keyReleaseEvent(QKeyEvent* event)
 
 bool AbstractNotationPaintView::event(QEvent* event)
 {
+    if (!isInited()) {
+        return QQuickPaintedItem::event(event);
+    }
+
     QEvent::Type eventType = event->type();
     auto keyEvent = dynamic_cast<QKeyEvent*>(event);
 
