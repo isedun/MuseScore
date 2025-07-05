@@ -80,7 +80,6 @@
 #include "timesig.h"
 
 #include "tuplet.h"
-#include "types.h"
 #include "undo.h"
 #include "utils.h"
 
@@ -2409,6 +2408,13 @@ bool Score::toggleArticulation(EngravingItem* el, Articulation* a)
         return false;
     }
 
+    Tapping* tap = c->tapping();
+    if (tap) {
+        // If we got here it means that the user is entering a tap
+        // of different hand, so replace the old one
+        undoRemoveElement(tap);
+    }
+
     if (!a->isDouble()) {
         a->setParent(c);
         a->setTrack(c->track());
@@ -2601,11 +2607,7 @@ void Score::cmdResetToDefaultLayout()
         Sid::genCourtesyClef,
         Sid::swingRatio,
         Sid::swingUnit,
-        Sid::useStandardNoteNames,
-        Sid::useGermanNoteNames,
-        Sid::useFullGermanNoteNames,
-        Sid::useSolfeggioNoteNames,
-        Sid::useFrenchNoteNames,
+        Sid::chordSymbolSpelling,
         Sid::automaticCapitalization,
         Sid::lowerCaseMinorChords,
         Sid::lowerCaseBassNotes,
@@ -2703,10 +2705,13 @@ void Score::cmdResetBeamMode()
         return;
     }
 
-    Fraction endTick = selection().tickEnd();
+    const staff_idx_t staffStart = selection().staffStart();
+    const staff_idx_t staffEnd = selection().staffEnd();
+    const Fraction endTick = selection().tickEnd();
 
-    for (Segment* seg = selection().firstChordRestSegment(); seg && seg->tick() < endTick; seg = seg->next1(SegmentType::ChordRest)) {
-        for (track_idx_t track = selection().staffStart() * VOICES; track < selection().staffEnd() * VOICES; ++track) {
+    for (track_idx_t track = staff2track(staffStart); track < staff2track(staffEnd); ++track) {
+        ChordRest* firstCR = selection().firstChordRest(track);
+        for (Segment* seg = firstCR->segment(); seg && seg->tick() < endTick; seg = seg->next1(SegmentType::ChordRest)) {
             ChordRest* cr = toChordRest(seg->element(track));
             if (!cr) {
                 continue;
@@ -2722,6 +2727,7 @@ void Score::cmdResetBeamMode()
             }
         }
     }
+
     if (noSelection) {
         deselectAll();
     }
@@ -3357,8 +3363,8 @@ void Score::cmdAddParentheses(EngravingItem* el)
         acc->undoChangeProperty(Pid::ACCIDENTAL_BRACKET, int(AccidentalBracket::PARENTHESIS));
     } else if (el->type() == ElementType::HARMONY) {
         Harmony* h = toHarmony(el);
-        h->setLeftParen(true);
-        h->setRightParen(true);
+        h->setLeftParen(!h->leftParen());
+        h->setRightParen(!h->rightParen());
         h->render();
     } else if (el->type() == ElementType::TIMESIG) {
         TimeSig* ts = toTimeSig(el);

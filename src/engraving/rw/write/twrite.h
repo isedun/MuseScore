@@ -26,9 +26,6 @@
 
 #include "../../dom/property.h"
 
-#include "global/modularity/ioc.h"
-#include "../../iengravingconfiguration.h"
-
 namespace mu::engraving {
 class EngravingItem;
 class ElementList;
@@ -44,7 +41,6 @@ class BagpipeEmbellishment;
 class BarLine;
 class Beam;
 class Bend;
-class StretchedBend;
 class Box;
 class HBox;
 class VBox;
@@ -153,6 +149,8 @@ class SystemDivider;
 class SystemText;
 class SoundFlag;
 
+class Tapping;
+class TappingHalfSlur;
 class TempoText;
 class Text;
 class TextBase;
@@ -192,7 +190,6 @@ public:
     static void write(const BarLine* item, XmlWriter& xml, WriteContext& ctx);
     static void write(const Beam* item, XmlWriter& xml, WriteContext& ctx);
     static void write(const Bend* item, XmlWriter& xml, WriteContext& ctx);
-    static void write(const StretchedBend* item, XmlWriter& xml, WriteContext& ctx);
     static void write(const Box* item, XmlWriter& xml, WriteContext& ctx);
     static void write(const HBox* item, XmlWriter& xml, WriteContext& ctx);
     static void write(const VBox* item, XmlWriter& xml, WriteContext& ctx);
@@ -294,6 +291,8 @@ public:
     static void write(const SystemText* item, XmlWriter& xml, WriteContext& ctx);
     static void write(const SoundFlag* item, XmlWriter& xml, WriteContext& ctx);
 
+    static void write(const Tapping* item, XmlWriter& xml, WriteContext& ctx);
+    static void write(const TappingHalfSlur* item, XmlWriter& xml, WriteContext& ctx);
     static void write(const TempoText* item, XmlWriter& xml, WriteContext& ctx);
     static void write(const Text* item, XmlWriter& xml, WriteContext& ctx);
     static void write(const TextLine* item, XmlWriter& xml, WriteContext& ctx);

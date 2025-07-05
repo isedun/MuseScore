@@ -38,14 +38,14 @@
 
 #include "engraving/dom/figuredbass.h"
 #include "engraving/dom/masterscore.h"
-#include "engraving/dom/realizedharmony.h"
+#include "engraving/dom/mmrestrange.h"
 #include "engraving/dom/stafftype.h"
 #include "engraving/dom/text.h"
 #include "engraving/dom/textline.h"
 #include "engraving/style/textstyle.h"
 #include "engraving/types/symnames.h"
-#include "engraving/types/typesconv.h"
 #include "engraving/types/types.h"
+#include "engraving/types/typesconv.h"
 
 #include "ui/view/widgetstatestore.h"
 #include "ui/view/widgetutils.h"
@@ -137,6 +137,7 @@ static const QStringList ALL_TEXT_STYLE_SUBPAGE_CODES {
     "tuplet",
     "sticking",
     "fingering",
+    "tab-fret-number",
     "lh-guitar-fingering",
     "rh-guitar-fingering",
     "hammer-ons-pull-offs-and-tapping",
@@ -314,6 +315,10 @@ EditStyle::EditStyle(QWidget* parent)
     mmRestConstantWidth->addButton(mmRestWidthProportional, 0);
     mmRestConstantWidth->addButton(mmRestWidthConstant, 1);
 
+    QButtonGroup* partialSlurAngle = new QButtonGroup(this);
+    partialSlurAngle->addButton(partialSlursAngleNormal, 0);
+    partialSlurAngle->addButton(partialSlursAngleWeird, 1);
+
     // ====================================================
     // Style widgets
     // ====================================================
@@ -326,9 +331,6 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::figuredBassYOffset,      false, doubleSpinFBVertPos,     0 },
         { StyleId::figuredBassLineHeight,   true,  spinFBLineHeight,        0 },
         { StyleId::keySigNaturals,          false, ksng,                    0 },
-        { StyleId::voltaLineStyle,          false, voltaLineStyle,          resetVoltaLineStyle },
-        { StyleId::voltaDashLineLen,        false, voltaLineStyleDashSize,  resetVoltaLineStyleDashSize },
-        { StyleId::voltaDashGapLen,         false, voltaLineStyleGapSize,   resetVoltaLineStyleGapSize },
         { StyleId::ottavaLineStyle,         false, ottavaLineStyle,         resetOttavaLineStyle },
         { StyleId::ottavaDashLineLen,       false, ottavaLineStyleDashSize, resetOttavaLineStyleDashSize },
         { StyleId::ottavaDashGapLen,        false, ottavaLineStyleGapSize,  resetOttavaLineStyleGapSize },
@@ -405,21 +407,21 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::repeatBarlineDotSeparation, false, repeatBarlineDotSeparation, resetRepeatBarlineDotSeparation },
 
         { StyleId::barGraceDistance,        false, barGraceDistance,        resetBarGraceDistance },
-        { StyleId::chordExtensionMag,       false, extensionMag,            resetExtensionMag },
-        { StyleId::chordExtensionAdjust,    false, extensionAdjust,         resetExtensionAdjust },
-        { StyleId::chordModifierMag,        false, modifierMag,             resetModifierMag },
-        { StyleId::chordModifierAdjust,     false, modifierAdjust,          resetModifierAdjust },
-        { StyleId::useStandardNoteNames,    false, useStandardNoteNames,    0 },
-        { StyleId::useGermanNoteNames,      false, useGermanNoteNames,      0 },
-        { StyleId::useFullGermanNoteNames,  false, useFullGermanNoteNames,  0 },
-        { StyleId::useSolfeggioNoteNames,   false, useSolfeggioNoteNames,   0 },
-        { StyleId::useFrenchNoteNames,      false, useFrenchNoteNames,      0 },
-        { StyleId::automaticCapitalization, false, automaticCapitalization, 0 },
+        // { StyleId::chordExtensionMag,       false, extensionMag,            resetExtensionMag },
+        // { StyleId::chordExtensionAdjust,    false, extensionAdjust,         resetExtensionAdjust },
+        // { StyleId::chordModifierMag,        false, modifierMag,             resetModifierMag },
+        // { StyleId::chordModifierAdjust,     false, modifierAdjust,          resetModifierAdjust },
+        // { StyleId::useStandardNoteNames,    false, useStandardNoteNames,    0 },
+        // { StyleId::useGermanNoteNames,      false, useGermanNoteNames,      0 },
+        // { StyleId::useFullGermanNoteNames,  false, useFullGermanNoteNames,  0 },
+        // { StyleId::useSolfeggioNoteNames,   false, useSolfeggioNoteNames,   0 },
+        // { StyleId::useFrenchNoteNames,      false, useFrenchNoteNames,      0 },
+        // { StyleId::automaticCapitalization, false, automaticCapitalization, 0 },
 
-        { StyleId::lowerCaseMinorChords,    false, lowerCaseMinorChords,    0 },
+        // { StyleId::lowerCaseMinorChords,    false, lowerCaseMinorChords,    0 },
 
-        { StyleId::lowerCaseBassNotes,      false, lowerCaseBassNotes,      0 },
-        { StyleId::allCapsNoteNames,        false, allCapsNoteNames,        0 },
+        // { StyleId::lowerCaseBassNotes,      false, lowerCaseBassNotes,      0 },
+        // { StyleId::allCapsNoteNames,        false, allCapsNoteNames,        0 },
         { StyleId::concertPitch,            false, concertPitch,            0 },
         { StyleId::createMultiMeasureRests, false, multiMeasureRests,       0 },
         { StyleId::minEmptyMeasures,        false, minEmptyMeasures,        0 },
@@ -492,6 +494,7 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::slurMidWidth,            false, slurMidLineWidth,        resetSlurMidLineWidth },
         { StyleId::slurDottedWidth,         false, slurDottedLineWidth,     resetSlurDottedLineWidth },
         { StyleId::slurMinDistance,         false, slurMinDistance,         resetSlurMinDistance },
+        { StyleId::angleHangingSlursAwayFromStaff, false, partialSlurAngle, 0 },
         { StyleId::tieEndWidth,             false, tieEndLineWidth,         resetTieEndLineWidth },
         { StyleId::tieMidWidth,             false, tieMidLineWidth,         resetTieMidLineWidth },
         { StyleId::tieDottedWidth,          false, tieDottedLineWidth,      resetTieDottedLineWidth },
@@ -519,9 +522,6 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::articulationStemHAlign,  false, articulationStemSide,    0 },
         { StyleId::articulationKeepTogether, false, articulationKeepTogether, 0 },
         { StyleId::trillAlwaysShowCueNote, false, trillAlwaysShowCueNote, 0 },
-        { StyleId::voltaPosAbove,           false, voltaPosAbove,           resetVoltaPosAbove },
-        { StyleId::voltaHook,               false, voltaHook,               resetVoltaHook },
-        { StyleId::voltaLineWidth,          false, voltaLineWidth,          resetVoltaLineWidth },
 
         { StyleId::ottavaPosAbove,          false, ottavaPosAbove,          resetOttavaPosAbove },
         { StyleId::ottavaPosBelow,          false, ottavaPosBelow,          resetOttavaPosBelow },
@@ -542,14 +542,14 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::vibratoPosAbove,         false, vibratoLinePosAbove,     resetVibratoLinePosAbove },
         { StyleId::vibratoPosBelow,         false, vibratoLinePosBelow,     resetVibratoLinePosBelow },
 
-        { StyleId::harmonyFretDist,         false, harmonyFretDist,         0 },
-        { StyleId::minHarmonyDistance,      false, minHarmonyDistance,      0 },
-        { StyleId::maxHarmonyBarDistance,   false, maxHarmonyBarDistance,   0 },
-        { StyleId::maxChordShiftAbove,      false, maxChordShiftAbove,      resetMaxChordShiftAbove },
-        { StyleId::maxChordShiftBelow,      false, maxChordShiftBelow,      resetMaxChordShiftBelow },
-        { StyleId::harmonyVoiceLiteral,     false, voicingSelectWidget->interpretBox, 0 },
-        { StyleId::harmonyVoicing,          false, voicingSelectWidget->voicingBox, 0 },
-        { StyleId::harmonyDuration,         false, voicingSelectWidget->durationBox, 0 },
+        // { StyleId::harmonyFretDist,         false, harmonyFretDist,         0 },
+        // { StyleId::minHarmonyDistance,      false, minHarmonyDistance,      0 },
+        // { StyleId::maxHarmonyBarDistance,   false, maxHarmonyBarDistance,   0 },
+        // { StyleId::maxChordShiftAbove,      false, maxChordShiftAbove,      resetMaxChordShiftAbove },
+        // { StyleId::maxChordShiftBelow,      false, maxChordShiftBelow,      resetMaxChordShiftBelow },
+        // { StyleId::harmonyVoiceLiteral,     false, voicingSelectWidget->interpretBox, 0 },
+        // { StyleId::harmonyVoicing,          false, voicingSelectWidget->voicingBox, 0 },
+        // { StyleId::harmonyDuration,         false, voicingSelectWidget->durationBox, 0 },
 
         { StyleId::tupletVHeadDistance,     false, tupletVHeadDistance,     resetTupletVHeadDistance },
         { StyleId::tupletVStemDistance,     false, tupletVStemDistance,     resetTupletVStemDistance },
@@ -599,7 +599,7 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::keySigCourtesyBarlineMode, false, ksbl,                        0 },
         { StyleId::timeSigCourtesyBarlineMode, false, tsbl,                       0 },
         { StyleId::swingRatio,               false, swingBox,                     0 },
-        { StyleId::chordsXmlFile,            false, chordsXmlFile,                0 },
+        // { StyleId::chordsXmlFile,            false, chordsXmlFile,                0 },
         { StyleId::dotMag,                   true,  dotMag,                       0 },
         { StyleId::articulationMag,          true,  articulationMag,              resetArticulationMag },
         { StyleId::shortenStem,              false, shortenStem,                  0 },
@@ -623,7 +623,7 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::oddFooterR,               false, oddFooterR,                   0 },
 
         { StyleId::ottavaNumbersOnly,        false, ottavaNumbersOnly,            resetOttavaNumbersOnly },
-        { StyleId::capoPosition,             false, capoPosition,                 0 },
+        // { StyleId::capoPosition,             false, capoPosition,                 0 },
         { StyleId::scaleBarlines,            false, scaleBarlines,                resetScaleBarlines },
         { StyleId::crossMeasureValues,       false, crossMeasureValues,           0 },
 
@@ -724,15 +724,6 @@ EditStyle::EditStyle(QWidget* parent)
     // ====================================================
 
     m_lineStyleSelects = {
-        new LineStyleSelect(this, voltaLineStyle, {
-            label_volta_lineStyle_dashSize,
-            voltaLineStyleDashSize,
-            resetVoltaLineStyleDashSize,
-            label_volta_lineStyle_gapSize,
-            voltaLineStyleGapSize,
-            resetVoltaLineStyleGapSize
-        }),
-
         new LineStyleSelect(this, ottavaLineStyle, {
             label_ottava_lineStyle_dashSize,
             ottavaLineStyleDashSize,
@@ -842,7 +833,7 @@ EditStyle::EditStyle(QWidget* parent)
     musicalSymbolFont->clear();
     dynamicsFont->clear();
     musicalTextFont->clear();
-    for (auto i : engravingFonts()->fonts()) {
+    for (const auto& i : engravingFonts()->fonts()) {
         QString fontDisplayName = QString::fromStdString(i->name());
         QString fontFamilyName = QString::fromStdString(i->family());
         musicalSymbolFont->addItem(fontDisplayName, fontDisplayName);
@@ -985,6 +976,37 @@ EditStyle::EditStyle(QWidget* parent)
     clefTimeKeySigPage->layout()->addWidget(clefKeyTimeSigPage.widget);
 
     // ====================================================
+    // REPEAT BARLINES STYLE SECTION (QML)
+    // ====================================================
+
+    auto repeatBarlinesSection = createQmlWidget(
+        repeatBarlinesGroupBox,
+        QUrl(QString::fromUtf8("qrc:/qml/MuseScore/NotationScene/internal/EditStyle/RepeatBarlinesSection.qml")));
+    repeatBarlinesSection.widget->setMinimumSize(224, 90);
+    repeatBarlinesGroupBox->layout()->addWidget(repeatBarlinesSection.widget);
+
+    // ====================================================
+    // CHORD SYMBOLS PAGE (QML)
+    // ====================================================
+
+    auto chordSymbolsPageWidget = createQmlWidget(
+        chordSymbolsPage,
+        QUrl(QString::fromUtf8("qrc:/qml/MuseScore/NotationScene/internal/EditStyle/ChordSymbolsPage.qml")));
+    chordSymbolsPageWidget.widget->setMinimumSize(224, 400);
+    connect(chordSymbolsPageWidget.view->rootObject(), SIGNAL(goToTextStylePage(QString)), this, SLOT(goToTextStylePage(QString)));
+    chordSymbolsPage->layout()->addWidget(chordSymbolsPageWidget.widget);
+
+    // ====================================================
+    // Voltas STYLE PAGE (QML)
+    // ====================================================
+
+    auto voltasPage = createQmlWidget(
+        voltasPageWidget,
+        QUrl(QString::fromUtf8("qrc:/qml/MuseScore/NotationScene/internal/EditStyle/VoltasPage.qml")));
+    voltasPage.widget->setMinimumSize(504, 400);
+    voltasPageWidget->layout()->addWidget(voltasPage.widget);
+
+    // ====================================================
     // Figured Bass
     // ====================================================
 
@@ -999,26 +1021,26 @@ EditStyle::EditStyle(QWidget* parent)
     // Chord Symbols
     // ====================================================
 
-    voicingSelectWidget->interpretBox->clear();
-    voicingSelectWidget->interpretBox->addItem(muse::qtrc("notation/editstyle", "Jazz"), int(0));   // two-item combobox for boolean style variant
-    voicingSelectWidget->interpretBox->addItem(muse::qtrc("notation/editstyle", "Literal"), int(1));   // true = literal
+    // voicingSelectWidget->interpretBox->clear();
+    // voicingSelectWidget->interpretBox->addItem(muse::qtrc("notation/editstyle", "Jazz"), int(0));   // two-item combobox for boolean style variant
+    // voicingSelectWidget->interpretBox->addItem(muse::qtrc("notation/editstyle", "Literal"), int(1));   // true = literal
 
-    voicingSelectWidget->voicingBox->clear();
-    voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Automatic"), int(Voicing::AUTO));
-    voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Root only"), int(Voicing::ROOT_ONLY));
-    voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Close"), int(Voicing::CLOSE));
-    voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Drop two"), int(Voicing::DROP_2));
-    voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Six note"), int(Voicing::SIX_NOTE));
-    voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Four note"), int(Voicing::FOUR_NOTE));
-    voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Three note"), int(Voicing::THREE_NOTE));
+    // voicingSelectWidget->voicingBox->clear();
+    // voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Automatic"), int(Voicing::AUTO));
+    // voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Root only"), int(Voicing::ROOT_ONLY));
+    // voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Close"), int(Voicing::CLOSE));
+    // voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Drop two"), int(Voicing::DROP_2));
+    // voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Six note"), int(Voicing::SIX_NOTE));
+    // voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Four note"), int(Voicing::FOUR_NOTE));
+    // voicingSelectWidget->voicingBox->addItem(muse::qtrc("notation/editstyle", "Three note"), int(Voicing::THREE_NOTE));
 
-    voicingSelectWidget->durationBox->clear();
-    voicingSelectWidget->durationBox->addItem(muse::qtrc("notation/editstyle", "Until next chord symbol"),
-                                              int(HDuration::UNTIL_NEXT_CHORD_SYMBOL));
-    voicingSelectWidget->durationBox->addItem(muse::qtrc("notation/editstyle", "Until end of measure"),
-                                              int(HDuration::STOP_AT_MEASURE_END));
-    voicingSelectWidget->durationBox->addItem(muse::qtrc("notation/editstyle", "Chord/rest duration"),
-                                              int(HDuration::SEGMENT_DURATION));
+    // voicingSelectWidget->durationBox->clear();
+    // voicingSelectWidget->durationBox->addItem(muse::qtrc("notation/editstyle", "Until next chord symbol"),
+    //                                           int(HDuration::UNTIL_NEXT_CHORD_SYMBOL));
+    // voicingSelectWidget->durationBox->addItem(muse::qtrc("notation/editstyle", "Until end of measure"),
+    //                                           int(HDuration::STOP_AT_MEASURE_END));
+    // voicingSelectWidget->durationBox->addItem(muse::qtrc("notation/editstyle", "Chord/rest duration"),
+    //                                           int(HDuration::SEGMENT_DURATION));
 
     // ====================================================
     // Miscellaneous
@@ -1031,14 +1053,6 @@ EditStyle::EditStyle(QWidget* parent)
     connect(disableVerticalSpread, &QGroupBox::clicked,         this, &EditStyle::disableVerticalSpreadClicked);
     connect(headerOddEven,         &QCheckBox::toggled,         this, &EditStyle::toggleHeaderOddEven);
     connect(footerOddEven,         &QCheckBox::toggled,         this, &EditStyle::toggleFooterOddEven);
-    connect(chordDescriptionFileButton, &QToolButton::clicked,  this, &EditStyle::selectChordDescriptionFile);
-    connect(chordsStandard,        &QRadioButton::toggled,      this, &EditStyle::setChordStyle);
-    connect(chordsJazz,            &QRadioButton::toggled,      this, &EditStyle::setChordStyle);
-    connect(chordsCustom,          &QRadioButton::toggled,      this, &EditStyle::setChordStyle);
-    connect(chordsXmlFile,         &QCheckBox::toggled,         this, &EditStyle::setChordStyle);
-    connect(chordDescriptionFile,  &QLineEdit::editingFinished, this, [=]() { setChordStyle(true); });
-
-    WidgetUtils::setWidgetIcon(chordDescriptionFileButton, IconCode::Code::OPEN_FILE);
 
     connect(swingOff,       &QRadioButton::toggled, this, &EditStyle::setSwingParams);
     connect(swingEighth,    &QRadioButton::toggled, this, &EditStyle::setSwingParams);
@@ -1150,7 +1164,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::FontFace);
     });
     connect(textStyleFontFace, &QFontComboBox::currentFontChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::FontFace, QVariant(textStyleFontFace->currentFont().family()));
+        textStyleValueChanged(TextStylePropertyType::FontFace, textStyleFontFace->currentFont().family());
     });
 
     // font size
@@ -1159,7 +1173,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::FontSize);
     });
     connect(textStyleFontSize, &QDoubleSpinBox::valueChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::FontSize, QVariant(textStyleFontSize->value()));
+        textStyleValueChanged(TextStylePropertyType::FontSize, textStyleFontSize->value());
     });
 
     // musical symbols scale
@@ -1168,7 +1182,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::MusicalSymbolsScale);
     });
     connect(textStyleMusicalSymbolsScale, &QDoubleSpinBox::valueChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::MusicalSymbolsScale, QVariant(textStyleMusicalSymbolsScale->value()));
+        textStyleValueChanged(TextStylePropertyType::MusicalSymbolsScale, textStyleMusicalSymbolsScale->value());
     });
 
     // line spacing
@@ -1177,7 +1191,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::LineSpacing);
     });
     connect(textStyleLineSpacing, &QDoubleSpinBox::valueChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::LineSpacing, QVariant(textStyleLineSpacing->value()));
+        textStyleValueChanged(TextStylePropertyType::LineSpacing, textStyleLineSpacing->value());
     });
 
     // font style
@@ -1186,7 +1200,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::FontStyle);
     });
     connect(textStyleFontStyle, &FontStyleSelect::fontStyleChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::FontStyle, QVariant(int(textStyleFontStyle->fontStyle())));
+        textStyleValueChanged(TextStylePropertyType::FontStyle, int(textStyleFontStyle->fontStyle()));
     });
 
     // align
@@ -1195,7 +1209,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::TextAlign);
     });
     connect(textStyleAlign, &AlignSelect::alignChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::TextAlign, PropertyValue(textStyleAlign->align()).toQVariant());
+        textStyleValueChanged(TextStylePropertyType::TextAlign, textStyleAlign->align());
     });
 
     // offset
@@ -1204,7 +1218,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::Offset);
     });
     connect(textStyleOffset, &OffsetSelect::offsetChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::Offset, QVariant(textStyleOffset->offset()));
+        textStyleValueChanged(TextStylePropertyType::Offset, textStyleOffset->offset());
     });
 
     // spatium dependent
@@ -1253,7 +1267,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::FrameBorderColor);
     });
     connect(textStyleFrameForeground, &Awl::ColorLabel::colorChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::FrameBorderColor, textStyleFrameForeground->color());
+        textStyleValueChanged(TextStylePropertyType::FrameBorderColor, Color::fromQColor(textStyleFrameForeground->color()));
     });
 
     WidgetUtils::setWidgetIcon(resetTextStyleFrameBackground, IconCode::Code::UNDO);
@@ -1261,7 +1275,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::FrameFillColor);
     });
     connect(textStyleFrameBackground, &Awl::ColorLabel::colorChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::FrameFillColor, textStyleFrameBackground->color());
+        textStyleValueChanged(TextStylePropertyType::FrameFillColor, Color::fromQColor(textStyleFrameBackground->color()));
     });
 
     WidgetUtils::setWidgetIcon(resetTextStyleColor, IconCode::Code::UNDO);
@@ -1269,7 +1283,7 @@ EditStyle::EditStyle(QWidget* parent)
         resetTextStyle(TextStylePropertyType::Color);
     });
     connect(textStyleColor, &Awl::ColorLabel::colorChanged, this, [=]() {
-        textStyleValueChanged(TextStylePropertyType::Color, textStyleColor->color());
+        textStyleValueChanged(TextStylePropertyType::Color, Color::fromQColor(textStyleColor->color()));
     });
 
     connect(textStyles, &QListWidget::currentRowChanged, this, &EditStyle::textStyleChanged);
@@ -1378,20 +1392,20 @@ void EditStyle::retranslate()
     tupletBracketType->setItemText(1, muse::qtrc("notation/editstyle", "Bracket"));
     tupletBracketType->setItemText(2, muse::qtrc("notation/editstyle", "None", "no tuplet bracket type"));
 
-    voicingSelectWidget->interpretBox->setItemText(0, muse::qtrc("notation/editstyle", "Jazz"));
-    voicingSelectWidget->interpretBox->setItemText(1, muse::qtrc("notation/editstyle", "Literal"));
+    // voicingSelectWidget->interpretBox->setItemText(0, muse::qtrc("notation/editstyle", "Jazz"));
+    // voicingSelectWidget->interpretBox->setItemText(1, muse::qtrc("notation/editstyle", "Literal"));
 
-    voicingSelectWidget->voicingBox->setItemText(0, muse::qtrc("notation/editstyle", "Automatic"));
-    voicingSelectWidget->voicingBox->setItemText(1, muse::qtrc("notation/editstyle", "Root only"));
-    voicingSelectWidget->voicingBox->setItemText(2, muse::qtrc("notation/editstyle", "Close"));
-    voicingSelectWidget->voicingBox->setItemText(3, muse::qtrc("notation/editstyle", "Drop two"));
-    voicingSelectWidget->voicingBox->setItemText(4, muse::qtrc("notation/editstyle", "Six note"));
-    voicingSelectWidget->voicingBox->setItemText(5, muse::qtrc("notation/editstyle", "Four note"));
-    voicingSelectWidget->voicingBox->setItemText(6, muse::qtrc("notation/editstyle", "Three note"));
+    // voicingSelectWidget->voicingBox->setItemText(0, muse::qtrc("notation/editstyle", "Automatic"));
+    // voicingSelectWidget->voicingBox->setItemText(1, muse::qtrc("notation/editstyle", "Root only"));
+    // voicingSelectWidget->voicingBox->setItemText(2, muse::qtrc("notation/editstyle", "Close"));
+    // voicingSelectWidget->voicingBox->setItemText(3, muse::qtrc("notation/editstyle", "Drop two"));
+    // voicingSelectWidget->voicingBox->setItemText(4, muse::qtrc("notation/editstyle", "Six note"));
+    // voicingSelectWidget->voicingBox->setItemText(5, muse::qtrc("notation/editstyle", "Four note"));
+    // voicingSelectWidget->voicingBox->setItemText(6, muse::qtrc("notation/editstyle", "Three note"));
 
-    voicingSelectWidget->durationBox->setItemText(0, muse::qtrc("notation/editstyle", "Until next chord symbol"));
-    voicingSelectWidget->durationBox->setItemText(1, muse::qtrc("notation/editstyle", "Until end of measure"));
-    voicingSelectWidget->durationBox->setItemText(2, muse::qtrc("notation/editstyle", "Chord/rest duration"));
+    // voicingSelectWidget->durationBox->setItemText(0, muse::qtrc("notation/editstyle", "Until next chord symbol"));
+    // voicingSelectWidget->durationBox->setItemText(1, muse::qtrc("notation/editstyle", "Until end of measure"));
+    // voicingSelectWidget->durationBox->setItemText(2, muse::qtrc("notation/editstyle", "Chord/rest duration"));
 
     setHeaderFooterToolTip();
 
@@ -1836,6 +1850,9 @@ QString EditStyle::subPageCodeForElement(const EngravingItem* element)
         case TextStyleType::FINGERING:
             return "fingering";
 
+        case TextStyleType::TAB_FRET_NUMBER:
+            return "tab-fret-number";
+
         case TextStyleType::LH_GUITAR_FINGERING:
             return "lh-guitar-fingering";
 
@@ -2131,6 +2148,7 @@ bool EditStyle::isBoolStyleRepresentedByButtonGroup(StyleId id)
     case StyleId::genKeysig:
     case StyleId::singleMeasureMMRestUseNormalRest:
     case StyleId::mmRestConstantWidth:
+    case StyleId::angleHangingSlursAwayFromStaff:
         return true;
     default:
         return false;
@@ -2222,9 +2240,8 @@ PropertyValue EditStyle::getValue(StyleId idx)
             QDoubleSpinBox* dsb = qobject_cast<QDoubleSpinBox*>(sw.widget);
             return PointF(0.0, dsb->value());
         }
-        OffsetSelect* cb = qobject_cast<OffsetSelect*>(sw.widget);
-        if (cb) {
-            return PointF::fromQPointF(cb->offset());
+        if (OffsetSelect* cb = qobject_cast<OffsetSelect*>(sw.widget)) {
+            return cb->offset();
         } else {
             ASSERT_X("unhandled muse::PointF");
         }
@@ -2291,7 +2308,7 @@ void EditStyle::setValues()
         case P_TYPE::BOOL: {
             bool value = val.toBool();
             if (sw.idx == StyleId::harmonyVoiceLiteral) { // special case for bool represented by a two-item combobox
-                voicingSelectWidget->interpretBox->setCurrentIndex(value);
+                // voicingSelectWidget->interpretBox->setCurrentIndex(value);
             } else if (isBoolStyleRepresentedByButtonGroup(sw.idx)) { // special case for bool represented by a two-item buttonGroup
                 qobject_cast<QButtonGroup*>(sw.widget)->button(1)->setChecked(value);
                 qobject_cast<QButtonGroup*>(sw.widget)->button(0)->setChecked(!value);
@@ -2371,7 +2388,7 @@ void EditStyle::setValues()
         case P_TYPE::POINT: {
             OffsetSelect* as = qobject_cast<OffsetSelect*>(sw.widget);
             if (as) {
-                as->setOffset(val.value<muse::PointF>().toQPointF());
+                as->setOffset(val.value<muse::PointF>());
             }
         } break;
         default: {
@@ -2404,20 +2421,6 @@ void EditStyle::setValues()
         swingOff->setChecked(true);
         swingBox->setEnabled(false);
     }
-    QString s(styleValue(StyleId::chordDescriptionFile).value<String>());
-    chordDescriptionFile->setText(s);
-    QString cstyle(styleValue(StyleId::chordStyle).value<String>());
-    if (cstyle == "std") {
-        chordsStandard->setChecked(true);
-        chordDescriptionGroup->setEnabled(false);
-    } else if (cstyle == "jazz") {
-        chordsJazz->setChecked(true);
-        chordDescriptionGroup->setEnabled(false);
-    } else {
-        chordsCustom->setChecked(true);
-        chordDescriptionGroup->setEnabled(true);
-    }
-    //formattingGroup->setEnabled(lstyle.chordList()->autoAdjust());
 
     // figured bass
     for (int i = 0; i < comboFBFont->count(); i++) {
@@ -2469,24 +2472,6 @@ void EditStyle::setValues()
                                            != defaultStyleValue(StyleId::lyricsDashMaxDistance));
 
     updateParenthesisIndicatingTiesGroupState();
-}
-
-//---------------------------------------------------------
-//   selectChordDescriptionFile
-//---------------------------------------------------------
-
-void EditStyle::selectChordDescriptionFile()
-{
-    muse::io::path_t dir = configuration()->userStylesPath();
-    std::vector<std::string> filter = { muse::trc("notation", "MuseScore chord symbol style files") + " (*.xml)" };
-
-    muse::io::path_t path = interactive()->selectOpeningFile(muse::qtrc("notation", "Load style"), dir, filter);
-    if (path.empty()) {
-        return;
-    }
-
-    chordDescriptionFile->setText(path.toQString());
-    setChordStyle(true);
 }
 
 //---------------------------------------------------------
@@ -2552,46 +2537,6 @@ void EditStyle::setStyleValue(StyleId id, const PropertyValue& value)
 void EditStyle::concertPitchToggled(bool checked)
 {
     setStyleValue(StyleId::concertPitch, checked);
-}
-
-//---------------------------------------------------------
-//   setChordStyle
-//---------------------------------------------------------
-
-void EditStyle::setChordStyle(bool checked)
-{
-    if (!checked) {
-        return;
-    }
-    String val;
-    String file;
-    bool chordsXml;
-    if (chordsStandard->isChecked()) {
-        val  = u"std";
-        file = u"chords_std.xml";
-        chordsXml = false;
-    } else if (chordsJazz->isChecked()) {
-        val  = u"jazz";
-        file = u"chords_jazz.xml";
-        chordsXml = false;
-    } else {
-        val = u"custom";
-        chordDescriptionGroup->setEnabled(true);
-        file = chordDescriptionFile->text();
-        chordsXml = chordsXmlFile->isChecked();
-    }
-    if (val != u"custom") {
-        chordsXmlFile->setChecked(chordsXml);
-        chordDescriptionGroup->setEnabled(false);
-        chordDescriptionFile->setText(file);
-    }
-
-    setStyleValue(StyleId::chordsXmlFile, chordsXml);
-    setStyleValue(StyleId::chordStyle, val);
-
-    if (!file.isEmpty()) {
-        setStyleValue(StyleId::chordDescriptionFile, file);
-    }
 }
 
 //---------------------------------------------------------
@@ -2874,7 +2819,7 @@ void EditStyle::textStyleChanged(int row)
             break;
 
         case TextStylePropertyType::Offset:
-            textStyleOffset->setOffset(styleValue(a.sid).value<PointF>().toQPointF());
+            textStyleOffset->setOffset(styleValue(a.sid).value<PointF>());
             resetTextStyleOffset->setEnabled(styleValue(a.sid) != defaultStyleValue(a.sid));
             break;
 
@@ -2943,7 +2888,7 @@ void EditStyle::textStyleChanged(int row)
 //   textStyleValueChanged
 //---------------------------------------------------------
 
-void EditStyle::textStyleValueChanged(TextStylePropertyType type, QVariant value)
+void EditStyle::textStyleValueChanged(TextStylePropertyType type, const PropertyValue& value)
 {
     TextStyleType tid = TextStyleType(textStyles->currentItem()->data(Qt::UserRole).toInt());
     const TextStyle* ts = textStyle(tid);
@@ -2951,9 +2896,9 @@ void EditStyle::textStyleValueChanged(TextStylePropertyType type, QVariant value
     for (const auto& a : *ts) {
         if (a.type == type) {
             if (type == TextStylePropertyType::MusicalSymbolsScale) {
-                setStyleQVariantValue(a.sid, value.toDouble() / 100);
+                setStyleValue(a.sid, value.toDouble() / 100);
             } else {
-                setStyleQVariantValue(a.sid, value);
+                setStyleValue(a.sid, value);
             }
             break;
         }

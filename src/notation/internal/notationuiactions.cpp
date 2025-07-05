@@ -751,25 +751,29 @@ const UiActionList NotationUiActions::m_actions = {
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_NOTATION_OPENED,
              TranslatableString("action", "&Horizontal frame"),
-             TranslatableString("action", "Append horizontal frame")
+             TranslatableString("action", "Insert horizontal frame at end of score"),
+             IconCode::Code::HORIZONTAL_FRAME
              ),
     UiAction("append-vbox",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_NOTATION_OPENED,
              TranslatableString("action", "&Vertical frame"),
-             TranslatableString("action", "Append vertical frame")
+             TranslatableString("action", "Insert vertical frame at end of score"),
+             IconCode::Code::VERTICAL_FRAME
              ),
     UiAction("append-textframe",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_NOTATION_OPENED,
              TranslatableString("action", "&Text frame"),
-             TranslatableString("action", "Append text frame")
+             TranslatableString("action", "Insert text frame at end of score"),
+             IconCode::Code::TEXT_FRAME
              ),
     UiAction("append-fretframe",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_NOTATION_OPENED,
              TranslatableString("action", "&Fretboard diagram legend"),
-             TranslatableString("action", "Append fretboard diagram legend")
+             TranslatableString("action", "Insert fretboard diagram legend at end of score"),
+             IconCode::Code::FRET_FRAME
              ),
     UiAction("acciaccatura",
              mu::context::UiCtxProjectOpened,
@@ -1881,6 +1885,18 @@ const UiActionList NotationUiActions::m_actions = {
              TranslatableString("action", "Toggle turn with slash"),
              TranslatableString("action", "Add ornament: turn with slash")
              ),
+    UiAction("add-turn-up",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_NOTATION_OPENED,
+             TranslatableString("action", "Toggle vertical turn"),
+             TranslatableString("action", "Add ornament: vertical turn")
+             ),
+    UiAction("add-turn-inverted-up",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_NOTATION_OPENED,
+             TranslatableString("action", "Toggle vertical inverted turn"),
+             TranslatableString("action", "Add ornament: vertical inverted turn")
+             ),
     UiAction("add-trill",
              mu::context::UiCtxProjectOpened,
              mu::context::CTX_NOTATION_OPENED,
@@ -1898,6 +1914,12 @@ const UiActionList NotationUiActions::m_actions = {
              mu::context::CTX_NOTATION_OPENED,
              TranslatableString("action", "Toggle mordent"),
              TranslatableString("action", "Add ornament: mordent")
+             ),
+    UiAction("add-haydn",
+             mu::context::UiCtxProjectOpened,
+             mu::context::CTX_NOTATION_OPENED,
+             TranslatableString("action", "Toggle Haydn ornament"),
+             TranslatableString("action", "Add ornament: Haydn ornament")
              ),
     UiAction("add-tremblement",
              mu::context::UiCtxProjectOpened,

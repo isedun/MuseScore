@@ -59,7 +59,6 @@ class FiguredBassItem;
 class FiguredBass;
 class Fingering;
 class FretDiagram;
-class FretCircle;
 
 class Glissando;
 class GlissandoSegment;
@@ -135,7 +134,6 @@ class Stem;
 class StemSlash;
 class Sticking;
 class StringTunings;
-class StretchedBend;
 
 class BSymbol;
 class Symbol;
@@ -147,6 +145,7 @@ class SystemLockIndicator;
 class SoundFlag;
 
 class TabDurationSymbol;
+class Tapping;
 class TempoText;
 class TextBase;
 class Text;
@@ -219,7 +218,6 @@ private:
     static void draw(const FiguredBassItem* item, muse::draw::Painter* painter);
     static void draw(const Fingering* item, muse::draw::Painter* painter);
     static void draw(const FretDiagram* item, muse::draw::Painter* painter);
-    static void draw(const FretCircle* item, muse::draw::Painter* painter);
 
     static void draw(const GlissandoSegment* item, muse::draw::Painter* painter);
     static void draw(const GradualTempoChangeSegment* item, muse::draw::Painter* painter);
@@ -287,7 +285,6 @@ private:
     static void draw(const StemSlash* item, muse::draw::Painter* painter);
     static void draw(const Sticking* item, muse::draw::Painter* painter);
     static void draw(const StringTunings* item, muse::draw::Painter* painter);
-    static void draw(const StretchedBend* item, muse::draw::Painter* painter);
     static void draw(const Symbol* item, muse::draw::Painter* painter);
     static void draw(const FSymbol* item, muse::draw::Painter* painter);
     static void draw(const SystemDivider* item, muse::draw::Painter* painter);
@@ -296,6 +293,7 @@ private:
     static void draw(const SoundFlag* item, muse::draw::Painter* painter);
 
     static void draw(const TabDurationSymbol* item, muse::draw::Painter* painter);
+    static void draw(const Tapping* item, muse::draw::Painter* painter);
     static void draw(const TempoText* item, muse::draw::Painter* painter);
     static void draw(const Text* item, muse::draw::Painter* painter);
     static void draw(const TextLineSegment* item, muse::draw::Painter* painter);

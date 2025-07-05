@@ -83,6 +83,7 @@ void ProjectActionsController::init()
     dispatcher()->reg(this, "file-save-a-copy", [this]() { saveProject(SaveMode::SaveCopy); });
     dispatcher()->reg(this, "file-save-selection", [this]() { saveProject(SaveMode::SaveSelection, SaveLocationType::Local); });
     dispatcher()->reg(this, "file-save-to-cloud", [this]() { saveProject(SaveMode::SaveAs, SaveLocationType::Cloud); });
+    dispatcher()->reg(this, "file-save-at", [this](const ActionData& args) { saveProjectAt(args); });
 
     dispatcher()->reg(this, "file-publish", this, &ProjectActionsController::publish);
     dispatcher()->reg(this, "file-share-audio", this, &ProjectActionsController::shareAudio);
@@ -189,13 +190,18 @@ Ret ProjectActionsController::openProject(const ProjectFile& file)
     LOGI() << "Try open project: url = " << file.url.toString() << ", displayNameOverride = " << file.displayNameOverride;
 
     if (file.isNull()) {
-        muse::io::path_t askedPath = selectScoreOpeningFile();
+        auto promise = selectScoreOpeningFile();
+        promise.onResolve(this, [this](const io::path_t& askedPath) {
+            if (askedPath.empty()) {
+                return;
+            }
 
-        if (askedPath.empty()) {
-            return make_ret(Ret::Code::Cancel);
-        }
+            configuration()->setLastOpenedProjectsPath(io::dirpath(askedPath));
 
-        return openProject(askedPath);
+            openProject(askedPath);
+        });
+
+        return muse::make_ok();
     }
 
     if (file.url.isLocalFile()) {
@@ -283,30 +289,18 @@ RetVal<INotationProjectPtr> ProjectActionsController::loadProject(const muse::io
 {
     TRACEFUNC;
 
-    auto project = projectCreator()->newProject(iocContext());
+    const auto project = projectCreator()->newProject(iocContext());
     IF_ASSERT_FAILED(project) {
         return make_ret(Ret::Code::InternalError);
     }
 
-    bool hasUnsavedChanges = projectAutoSaver()->projectHasUnsavedChanges(filePath);
+    const bool hasUnsavedChanges = projectAutoSaver()->projectHasUnsavedChanges(filePath);
 
-    muse::io::path_t loadPath = hasUnsavedChanges ? projectAutoSaver()->projectAutoSavePath(filePath) : filePath;
-    std::string format = io::suffix(filePath);
+    const muse::io::path_t loadPath = hasUnsavedChanges ? projectAutoSaver()->projectAutoSavePath(filePath) : filePath;
+    const std::string format = io::suffix(filePath);
 
-    Ret ret = project->load(loadPath, "" /*stylePath*/, false /*forceMode*/, format);
-
-    if (!ret) {
-        if (ret.code() == static_cast<int>(Ret::Code::Cancel)) {
-            return ret;
-        }
-
-        if (checkCanIgnoreError(ret, loadPath)) {
-            ret = project->load(loadPath, "" /*stylePath*/, true /*forceMode*/, format);
-        }
-
-        if (!ret) {
-            return ret;
-        }
+    if (Ret result = loadWithFallback(project, loadPath, format); !result) {
+        return result;
     }
 
     if (hasUnsavedChanges) {
@@ -316,12 +310,31 @@ RetVal<INotationProjectPtr> ProjectActionsController::loadProject(const muse::io
         project->markAsUnsaved();
     }
 
-    bool isNewlyCreated = projectAutoSaver()->isAutosaveOfNewlyCreatedProject(filePath);
-    if (isNewlyCreated) {
+    if (projectAutoSaver()->isAutosaveOfNewlyCreatedProject(filePath)) {
         project->markAsNewlyCreated();
     }
 
     return RetVal<INotationProjectPtr>::make_ok(project);
+}
+
+Ret ProjectActionsController::loadWithFallback(const std::shared_ptr<INotationProject>& project,
+                                               const muse::io::path_t& loadPath,
+                                               const std::string& format)
+{
+    bool forceLoad = false;
+    const std::string stylePath = "";
+    Ret result = project->load(loadPath, stylePath, forceLoad, format);
+
+    if (result || result.code() == static_cast<int>(Ret::Code::Cancel)) {
+        return result;
+    }
+
+    forceLoad = shouldRetryLoadAfterError(result, loadPath);
+    if (forceLoad) {
+        result = project->load(loadPath, stylePath, forceLoad, format);
+    }
+
+    return result;
 }
 
 Ret ProjectActionsController::doOpenProject(const muse::io::path_t& filePath)
@@ -899,6 +912,14 @@ void ProjectActionsController::shareAudio(const AudioFile& existingAudio)
     });
 
     isSharingFinished = false;
+}
+
+void ProjectActionsController::saveProjectAt(const muse::actions::ActionData& args)
+{
+    io::path_t path = !args.empty() ? args.arg<io::path_t>(0) : io::path_t();
+    if (!path.empty()) {
+        saveProjectAt(SaveLocation(path));
+    }
 }
 
 bool ProjectActionsController::saveProjectAt(const SaveLocation& location, SaveMode saveMode, bool force)
@@ -1713,7 +1734,7 @@ void ProjectActionsController::moveProject(INotationProjectPtr project, const mu
     recentFilesController()->moveRecentFile(oldPath, makeRecentFile(project));
 }
 
-bool ProjectActionsController::checkCanIgnoreError(const Ret& ret, const muse::io::path_t& filepath)
+bool ProjectActionsController::shouldRetryLoadAfterError(const Ret& ret, const muse::io::path_t& filepath)
 {
     if (ret) {
         return true;
@@ -1732,10 +1753,10 @@ bool ProjectActionsController::checkCanIgnoreError(const Ret& ret, const muse::i
         warnProjectCriticallyCorrupted(io::filename(filepath).toString(), ret.text());
         return false;
     default:
+        warnProjectCannotBeOpened(ret, filepath);
         break;
     }
 
-    warnProjectCannotBeOpened(ret, filepath);
     return false;
 }
 
@@ -1863,7 +1884,7 @@ void ProjectActionsController::printScore()
     printProvider()->printNotation(notation);
 }
 
-muse::io::path_t ProjectActionsController::selectScoreOpeningFile()
+async::Promise<io::path_t> ProjectActionsController::selectScoreOpeningFile() const
 {
     std::string allExt = "*.mscz *.mxl *.musicxml *.xml *.mid *.midi *.kar *.md *.mgu *.sgu *.cap *.capx "
                          "*.ove *.scw *.bmw *.bww *.gtp *.gp3 *.gp4 *.gp5 *.gpx *.gp *.ptb *.mei *.mscx *.mscs *.mscz~";
@@ -1894,13 +1915,7 @@ muse::io::path_t ProjectActionsController::selectScoreOpeningFile()
         defaultDir = configuration()->defaultUserProjectsPath();
     }
 
-    muse::io::path_t filePath = interactive()->selectOpeningFile(muse::qtrc("project", "Open"), defaultDir, filter);
-
-    if (!filePath.empty()) {
-        configuration()->setLastOpenedProjectsPath(io::dirpath(filePath));
-    }
-
-    return filePath;
+    return interactive()->selectOpeningFile(muse::trc("project", "Open"), defaultDir, filter);
 }
 
 bool ProjectActionsController::hasSelection() const

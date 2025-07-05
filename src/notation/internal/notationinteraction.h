@@ -157,7 +157,7 @@ public:
     bool textEditingAllowed(const EngravingItem* element) const override;
     void startEditText(EngravingItem* element, const muse::PointF& cursorPos = muse::PointF()) override;
     void editText(QInputMethodEvent* event) override;
-    void endEditText() override;
+    void endEditText(bool startNonTextualEdit = true) override;
     void changeTextCursorPosition(const muse::PointF& newCursorPos) override;
     void selectText(mu::engraving::SelectTextType type) override;
     const TextBase* editedText() const override;
@@ -350,6 +350,12 @@ private:
     void doEndEditElement();
     void doEndDrag();
 
+    //! NOTE: Helper methods for applyPaletteElement
+    void applyPaletteElementToList(EngravingItem* element, bool isMeasureAnchoredElement, mu::engraving::Score* score,
+                                   const mu::engraving::Selection& sel, Qt::KeyboardModifiers modifiers = {});
+    void applyPaletteElementToRange(EngravingItem* element, bool isMeasureAnchoredElement, mu::engraving::Score* score,
+                                    const mu::engraving::Selection& sel, Qt::KeyboardModifiers modifiers = {});
+
     bool doDropStandard();
     bool doDropTextBaseAndSymbols(const muse::PointF& pos, bool applyUserOffset);
 
@@ -373,7 +379,8 @@ private:
     void toggleVerticalAlignment(mu::engraving::VerticalAlignment);
     void navigateToLyrics(bool, bool, bool);
 
-    mu::engraving::Harmony* editedHarmony() const;
+    Harmony* editedHarmony() const;
+    Segment* harmonySegment(const Harmony* harmony) const;
     mu::engraving::Harmony* findHarmonyInSegment(const mu::engraving::Segment* segment, engraving::track_idx_t track,
                                                  mu::engraving::TextStyleType textStyleType) const;
     mu::engraving::Harmony* createHarmony(mu::engraving::Segment* segment, engraving::track_idx_t track,

@@ -392,10 +392,11 @@ void DockWindow::loadPanels(const DockPageView* page)
     TRACEFUNC;
 
     for (DockPanelView* panel : page->panels()) {
-        if (DockPanelView* destinationPanel = findDestinationForPanel(page, panel)) {
+        if (DockPanelView* destinationPanel = page->findPanelForTab(panel)) {
             addPanelAsTab(panel, destinationPanel);
             continue;
         }
+
         const Location location = panel->location();
         const bool isSideLocation = location == Location::Left || location == Location::Right;
         addDock(panel, location, isSideLocation ? page->centralDock() : nullptr);
@@ -462,16 +463,6 @@ void DockWindow::alignTopLevelToolBars(const DockPageView* page)
     lastCentralToolBar->setMinimumWidth(lastCentralToolBar->contentWidth() + deltaForLastCentralToolBar);
 }
 
-DockPanelView* DockWindow::findDestinationForPanel(const DockPageView* page, const DockPanelView* panel) const
-{
-    for (DockPanelView* destinationPanel : page->panels()) {
-        if (destinationPanel->isTabAllowed(panel)) {
-            return destinationPanel;
-        }
-    }
-    return nullptr;
-}
-
 void DockWindow::addDock(DockBase* dock, Location location, const DockBase* relativeTo)
 {
     TRACEFUNC;
@@ -480,7 +471,7 @@ void DockWindow::addDock(DockBase* dock, Location location, const DockBase* rela
 
     KDDockWidgets::DockWidgetBase* relativeDock = relativeTo ? relativeTo->dockWidget() : nullptr;
 
-    auto visibilityOption = dock->isVisible() ? KDDockWidgets::InitialVisibilityOption::StartVisible
+    auto visibilityOption = dock->defaultVisibility() ? KDDockWidgets::InitialVisibilityOption::StartVisible
                             : KDDockWidgets::InitialVisibilityOption::StartHidden;
 
     KDDockWidgets::InitialOption options(visibilityOption, dock->preferredSize());
@@ -522,7 +513,7 @@ void DockWindow::handleUnknownDock(const DockPageView* page, DockBase* unknownDo
         return;
     }
 
-    if (DockPanelView* destinationPanel = findDestinationForPanel(page, unknownPanel)) {
+    if (DockPanelView* destinationPanel = page->findPanelForTab(unknownPanel)) {
         addPanelAsTab(unknownPanel, destinationPanel);
         return;
     }
@@ -565,6 +556,8 @@ bool DockWindow::doLoadPage(const QString& uri, const QVariantMap& params)
         return false;
     }
 
+    newPage->setVisible(true);
+
     loadPageContent(newPage);
     restorePageState(newPage);
     initDocks(newPage);
@@ -575,8 +568,6 @@ bool DockWindow::doLoadPage(const QString& uri, const QVariantMap& params)
 
     connect(m_currentPage, &DockPageView::layoutRequested,
             this, &DockWindow::forceLayout, Qt::UniqueConnection);
-
-    m_currentPage->setVisible(true);
 
     return true;
 }
@@ -824,7 +815,7 @@ void DockWindow::adjustContentForAvailableSpace(DockPageView* page)
     QList<DockBase*> topLevelToolBarsDocks;
 
     for (DockToolBarView* toolBar : topLevelToolBars(page)) {
-        if (!toolBar->dockWidget()->isFloating()) {
+        if (!toolBar->dockWidget()->isFloating() && toolBar->isVisible()) {
             topLevelToolBarsDocks << toolBar;
         }
     }

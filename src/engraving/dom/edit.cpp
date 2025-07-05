@@ -27,6 +27,7 @@
 
 #include "accidental.h"
 #include "anchors.h"
+#include "arpeggio.h"
 #include "articulation.h"
 #include "barline.h"
 #include "beam.h"
@@ -3104,6 +3105,14 @@ void Score::deleteItem(EngravingItem* el)
     }
     break;
 
+    case ElementType::TAPPING_HALF_SLUR_SEGMENT:
+    {
+        TappingHalfSlur* halfSlur = toTappingHalfSlur(toTappingHalfSlurSegment(el)->spanner());
+        Tapping* tapping = toTapping(halfSlur->parent());
+        undoRemoveElement(tapping);
+        break;
+    }
+
     case ElementType::HAMMER_ON_PULL_OFF_TEXT:
         undoRemoveHopoText(toHammerOnPullOffText(el));
         break;
@@ -3521,7 +3530,7 @@ void Score::deleteOrShortenOutSpannersFromRange(const Fraction& t1, const Fracti
         if (sp->isVolta() || sp->systemFlag()) {
             continue;
         }
-        if (!filter.canSelectVoice(sp->track())) {
+        if (!filter.canSelectVoice(sp->track()) || !filter.canSelect(sp)) {
             continue;
         }
         if (sp->track() >= track1 && sp->track() < track2) {
@@ -3558,7 +3567,7 @@ void Score::deleteSlursFromRange(const Fraction& t1, const Fraction& t2, track_i
         if (!sp->isSlur()) {
             continue;
         }
-        if (!filter.canSelectVoice(sp->track())) {
+        if (!filter.canSelectVoice(sp->track()) || !filter.canSelect(sp)) {
             continue;
         }
 
@@ -3605,12 +3614,12 @@ void Score::deleteAnnotationsFromRange(Segment* s1, Segment* s2, track_idx_t tra
     }
 }
 
-void Score::deleteRangeAtTrack(std::vector<ChordRest*>& crsToSelect, const track_idx_t track, Segment* startSeg,
-                               const Fraction& endTick, Tuplet* currentTuplet)
+void Score::deleteRangeAtTrack(std::vector<ChordRest*>& crsToSelect, const track_idx_t track, Segment* startSeg, const Fraction& endTick,
+                               Tuplet* currentTuplet, const SelectionFilter& filter, bool selectionContainsMultiNoteChords)
 {
-    while (startSeg && !startSeg->cr(track)) {
+    while (startSeg && !(startSeg->isChordRestType() && startSeg->cr(track))) {
         // Range should always start at a ChordRest segment - find the next one for this track...
-        startSeg = startSeg->next1();
+        startSeg = startSeg->next1(SegmentType::ChordRest);
     }
 
     if (!startSeg) {
@@ -3625,7 +3634,7 @@ void Score::deleteRangeAtTrack(std::vector<ChordRest*>& crsToSelect, const track
     const auto foundDeselected = [&](const DurationElement* deselectedElement) {
         const std::vector<Rest*> rests = setRests(restStartTick, track, restDuration, /*useDots*/ !currentTuplet, currentTuplet);
         crsToSelect.insert(crsToSelect.end(), rests.begin(), rests.end());
-        restStartTick = deselectedElement->tick() + deselectedElement->ticks();
+        restStartTick = deselectedElement->tick() + deselectedElement->actualTicks();
         restDuration = Fraction();
     };
 
@@ -3658,8 +3667,8 @@ void Score::deleteRangeAtTrack(std::vector<ChordRest*>& crsToSelect, const track
 
         // currentTuplet refers to the tuplet that we're currently performing a delete range "inside". It is possible that currentTuplet contains nested
         // tuplets, in which case we should find the "top-most nested tuplet" (nextTuplet) and:
-        //      1. If it is selected, delete it completely using cmdDeleteTuplet (deletes all elements contained in that tuplet)
-        //      2. If it is not selected, call this method recursively "inside" that tuplet (nextTuplet becomes currentTuplet for the recursive call)
+        //      1. If it is selectable, delete it completely using cmdDeleteTuplet (deletes all elements contained in that tuplet)
+        //      2. If it is not selectable, call this method recursively "inside" that tuplet (nextTuplet becomes currentTuplet for the recursive call)
 
         Tuplet* nextTuplet = nullptr;
         if (cr1->tuplet() && cr1->tuplet() != currentTuplet) {
@@ -3680,11 +3689,12 @@ void Score::deleteRangeAtTrack(std::vector<ChordRest*>& crsToSelect, const track
             }
             s = toChordRest(lastInTuplet)->segment();
 
-            if (nextTuplet->selected()) {
+            if (filter.canSelectTuplet(nextTuplet, cr1->tick(), endTick, selectionContainsMultiNoteChords)) {
                 restDuration += nextTuplet->ticks();
                 cmdDeleteTuplet(nextTuplet, /*replaceWithRest*/ false);
             } else {
-                deleteRangeAtTrack(crsToSelect, track, cr1->segment(), nextTuplet->tick() + nextTuplet->ticks(), nextTuplet);
+                const Fraction recursionEnd = std::min(nextTuplet->tick() + nextTuplet->actualTicks(), endTick);
+                deleteRangeAtTrack(crsToSelect, track, cr1->segment(), recursionEnd, nextTuplet, filter, selectionContainsMultiNoteChords);
                 foundDeselected(nextTuplet);
             }
 
@@ -3693,6 +3703,30 @@ void Score::deleteRangeAtTrack(std::vector<ChordRest*>& crsToSelect, const track
             }
 
             continue;
+        }
+
+        for (EngravingItem* elem : collectElementsAnchoredToChordRest(cr1)) {
+            if (!elem->isChord()) {
+                if (filter.canSelect(elem)) {
+                    undoRemoveElement(elem);
+                }
+                continue;
+            }
+            // Special handling for grace notes...
+            const Chord* chord = toChord(elem);
+            IF_ASSERT_FAILED(chord->isGrace()) {
+                continue;
+            }
+            std::unordered_set<EngravingItem*> anchoredToGrace = collectElementsAnchoredToChordRest(chord);
+            for (const Note* graceNote : chord->notes()) {
+                const std::unordered_set<EngravingItem*> noteAnchored = collectElementsAnchoredToNote(graceNote, true, false);
+                anchoredToGrace.insert(noteAnchored.begin(), noteAnchored.end());
+            }
+            for (EngravingItem* graceElem : anchoredToGrace) {
+                if (filter.canSelect(graceElem)) {
+                    undoRemoveElement(graceElem);
+                }
+            }
         }
 
         if (cr1->isRestFamily()) {
@@ -3705,15 +3739,33 @@ void Score::deleteRangeAtTrack(std::vector<ChordRest*>& crsToSelect, const track
             continue;
         }
 
-        // TODO: The following logic is redundant for now, but once our "NotesInChords" selection filter is implemented it'll
-        // be possible to have individually de-selected notes/chords within a selection range. Additionally we won't be using
-        // note->selected() (or tuplet->selected() as above) - instead we'll use SelectionFilter for this purpose...
-        const std::vector<Note*> allNotes = toChord(cr1)->notes();
+        Chord* chord = toChord(cr1);
+
+        const std::vector<Note*> allNotes = chord->notes();
         std::unordered_set<Note*> notesToRemove;
-        for (Note* note : allNotes) {
-            if (note->selected()) {
+        for (size_t noteIdx = 0; noteIdx < allNotes.size(); ++noteIdx) {
+            Note* note = allNotes.at(noteIdx);
+            if (filter.canSelectNoteIdx(noteIdx, allNotes.size(), selectionContainsMultiNoteChords)) {
                 notesToRemove.emplace(note);
+                //! NOTE: Don't need to remove anchored elements - they won't survive the deletion of their parent note...
+                continue;
             }
+            for (EngravingItem* elem : collectElementsAnchoredToNote(note, true, false)) {
+                if (!filter.canSelect(elem)) {
+                    continue;
+                }
+                if (!elem->isSpanner() || elem->isPartialTie() || elem->isLaissezVib()) {
+                    undoRemoveElement(elem);
+                    continue;
+                }
+                if (noteAnchoredSpannerIsInRange(toSpanner(elem), cr1->tick(), endTick)) {
+                    undoRemoveElement(elem);
+                }
+            }
+            if (!filter.canSelectNoteIdx(noteIdx, allNotes.size(), selectionContainsMultiNoteChords)) {
+                continue;
+            }
+            notesToRemove.emplace(note);
         }
 
         if (notesToRemove.size() == allNotes.size()) {
@@ -3740,7 +3792,8 @@ void Score::deleteRangeAtTrack(std::vector<ChordRest*>& crsToSelect, const track
 ///   deletion operation.
 //---------------------------------------------------------
 
-std::vector<ChordRest*> Score::deleteRange(Segment* s1, Segment* s2, track_idx_t track1, track_idx_t track2, const SelectionFilter& filter)
+std::vector<ChordRest*> Score::deleteRange(Segment* s1, Segment* s2, track_idx_t track1, track_idx_t track2, const SelectionFilter& filter,
+                                           bool selectionContainsMultiNoteChords)
 {
     std::vector<ChordRest*> crsForSelection;
     IF_ASSERT_FAILED(s1) {
@@ -3765,7 +3818,7 @@ std::vector<ChordRest*> Score::deleteRange(Segment* s1, Segment* s2, track_idx_t
         if (!filter.canSelectVoice(track)) {
             continue;
         }
-        deleteRangeAtTrack(crsForSelection, track, s1, endTick, /*currentTuplet*/ nullptr);
+        deleteRangeAtTrack(crsForSelection, track, s1, endTick, /*currentTuplet*/ nullptr, filter, selectionContainsMultiNoteChords);
     }
 
     return crsForSelection;
@@ -3783,7 +3836,7 @@ void Score::cmdDeleteSelection()
     if (selection().isRange()) {
         crsSelectedAfterDeletion = deleteRange(selection().startSegment(), selection().endSegment(),
                                                staff2track(selection().staffStart()), staff2track(selection().staffEnd()),
-                                               selectionFilter());
+                                               selectionFilter(), selection().rangeContainsMultiNoteChords());
     } else {
         // deleteItem modifies selection().elements() list,
         // so we need a local copy:
@@ -3867,15 +3920,17 @@ void Score::cmdDeleteSelection()
                 continue;
             }
 
-            // We can't delete elements inside fret box
+            // We can't delete elements inside fret box, instead we hide them
             if (e->isFretDiagram() || e->isHarmony()) {
-                if (e->isFretDiagram() && e->explicitParent()->isFBox()) {
+                if (e->isFretDiagram() && toFretDiagram(e)->isInFretBox()) {
+                    undoChangeVisible(e, false);
                     elSelectedAfterDeletion = toFBox(e->explicitParent());
                     continue;
-                } else {
+                } else if (e->isHarmony()) {
                     EngravingObject* parent = toHarmony(e)->explicitParent();
                     FretDiagram* fretDiagram = parent->isFretDiagram() ? toFretDiagram(parent) : nullptr;
-                    if (fretDiagram && fretDiagram->explicitParent()->isFBox()) {
+                    if (fretDiagram && fretDiagram->isInFretBox()) {
+                        undoChangeVisible(fretDiagram, false);
                         elSelectedAfterDeletion = toFBox(fretDiagram->explicitParent());
                         continue;
                     }
@@ -3890,6 +3945,13 @@ void Score::cmdDeleteSelection()
                     elSelectedAfterDeletion = fretDiagram->segment()->findAnnotation(ElementType::HARMONY,
                                                                                      fretDiagram->track(),
                                                                                      fretDiagram->track());
+                }
+            }
+
+            if (e->isHarmony()) {
+                Harmony* harmony = toHarmony(e);
+                if (harmony->parentItem()->isFretDiagram()) {
+                    elSelectedAfterDeletion = harmony->parentItem();
                 }
             }
 
@@ -5792,9 +5854,14 @@ void Score::undoChangeChordRestLen(ChordRest* cr, const TDuration& d)
 //   undoTransposeHarmony
 //---------------------------------------------------------
 
-void Score::undoTransposeHarmony(Harmony* h, int rootTpc, int baseTpc)
+void Score::undoTransposeHarmony(Harmony* h, Interval interval, bool doubleSharpFlat)
 {
-    undo(new TransposeHarmony(h, rootTpc, baseTpc));
+    undo(new TransposeHarmony(h, interval, doubleSharpFlat));
+}
+
+void Score::undoTransposeHarmonyDiatonic(Harmony* h, int interval, bool doubleSharpFlat, bool transposeKeys)
+{
+    undo(new TransposeHarmonyDiatonic(h, interval, doubleSharpFlat, transposeKeys));
 }
 
 //---------------------------------------------------------
@@ -6344,6 +6411,7 @@ void Score::undoAddElement(EngravingItem* element, bool addToLinkedStaves, bool 
     if (ostaff == 0 || (
             et != ElementType::ARTICULATION
             && et != ElementType::ORNAMENT
+            && et != ElementType::TAPPING
             && et != ElementType::CHORDLINE
             && et != ElementType::LYRICS
             && et != ElementType::SLUR
@@ -6616,9 +6684,7 @@ void Score::undoAddElement(EngravingItem* element, bool addToLinkedStaves, bool 
                         if (!score->style().styleB(Sid::concertPitch)) {
                             interval.flip();
                         }
-                        int rootTpc = transposeTpc(h->rootTpc(), interval, true);
-                        int baseTpc = transposeTpc(h->bassTpc(), interval, true);
-                        score->undoTransposeHarmony(h, rootTpc, baseTpc);
+                        score->undoTransposeHarmony(h, interval);
                     }
                 }
             }
